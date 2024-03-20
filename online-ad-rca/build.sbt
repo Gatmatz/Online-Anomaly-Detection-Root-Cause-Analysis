@@ -1,6 +1,6 @@
 name := "online-ad-rca"
 organization := "auth.dws"
-version := "0.1"
+version := "0.2"
 
 val scalaMainVersion = "2.12"
 ThisBuild / scalaVersion := scalaMainVersion + ".12"
