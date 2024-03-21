@@ -9,8 +9,9 @@ class AChao[T](capacity: Int, random: Random = new Random) {
   private val reservoirCapacity: Int = capacity
   private val overweightItems: mutable.PriorityQueue[OverweightRecord] = mutable.PriorityQueue.empty(Ordering[OverweightRecord])
 
+  def this(capacity: Int) = this(capacity, new Random())
   def insert(record:T, weight:Double): Unit = {
-    runningCount = runningCount * weight
+    runningCount = runningCount + weight
 
     updateOverweightItems()
 
@@ -49,10 +50,13 @@ class AChao[T](capacity: Int, random: Random = new Random) {
       }
   }
 
-  protected def decayWeights(decay: Double): Unit = {
-    runningCount = runningCount * decay
-    overweightItems.foreach(i => i.weight *= decay)
+  def decayWeights(decay: Double): Unit = {
+    runningCount *= decay
+    val updatedOverweightItems = overweightItems.map(i => OverweightRecord(i.record, i.weight * decay))
+    overweightItems.clear()
+    overweightItems ++= updatedOverweightItems
   }
+
 
   def getReservoir: List[T] = {
     updateOverweightItems()
@@ -64,9 +68,10 @@ class AChao[T](capacity: Int, random: Random = new Random) {
 
         assert(overweightList.size <= reservoirCapacity)
 
+        // Fill the return value with a sample of non-overweight elements
         val shuffledReservoir = Random.shuffle(reservoir)
         val remainingRecords = reservoirCapacity - overweightList.size
-        overweightList ::: shuffledReservoir.take(remainingRecords)
+        overweightList ::: shuffledReservoir.take(remainingRecords).toList
       }
     else
       {
