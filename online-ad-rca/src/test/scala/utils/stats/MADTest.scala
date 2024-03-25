@@ -1,10 +1,10 @@
-import models.InputRecord
+import models.{Dimension, InputRecord}
 import org.apache.commons.math3.linear.ArrayRealVector
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import utils.Types.{ChildDimension, ParentDimension}
 import utils.stats.MAD
 
-import java.util
 import scala.collection.mutable.ListBuffer
 
 class MADTest {
@@ -12,12 +12,17 @@ class MADTest {
   def simpleTest(): Unit = {
     val m: MAD = new MAD()
 
-    val data: ListBuffer[InputRecord] = ListBuffer()
+    val data: ListBuffer[InputRecord] = ListBuffer.empty[InputRecord]
     for (i <- 0 until 100) {
-      val sample: Array[Double] = Array(i.toDouble)
-//      data += new InputRecord(new util.ArrayList[Double](), new ArrayRealVector(sample))
+      val input_record: InputRecord = InputRecord(
+        id = "simpleTest",
+        timestamp = "1998-01-01T22:07:58",
+        value = i,
+        dimensions = Map("sm_type" -> Dimension("sm_type", "OVERNIGHT", "delivery", 1)),
+        dimensions_hierarchy = Map[ChildDimension, ParentDimension]()
+      )
+      data += input_record
     }
-
     m.train(data.toList)
     assertEquals(1.98, m.score(data.head), 1e-5)
     assertEquals(1.98, m.score(data.last), 1e-5)
@@ -30,12 +35,19 @@ class MADTest {
 
     val data: ListBuffer[InputRecord] = ListBuffer()
     for (i <- 0 until 30) {
-      val sample: Array[Double] = if (i == 0 || i >= 28) Array(5.0) else Array(10.0)
-//      data += new InputRecord(new java.util.ArrayList[Double](), new ArrayRealVector(sample))
+      val sample: Double = if (i == 0 || i >= 28) 5.0 else 10.0
+      val input_record: InputRecord = InputRecord(
+        id = "zeroMADTest",
+        timestamp = "1998-01-01T22:07:58",
+        value = sample,
+        dimensions = Map("sm_type" -> Dimension("sm_type", "OVERNIGHT", "delivery", 1)),
+        dimensions_hierarchy = Map[ChildDimension, ParentDimension]()
+      )
+      data += input_record
     }
 
     m.train(data.toList)
-    assertEquals(27, m.score(data(0)), 0)
+    assertEquals(27, m.score(data.head), 0)
     assertEquals(0, m.score(data(2)), 0)
   }
 
@@ -45,12 +57,26 @@ class MADTest {
 
     val data: ListBuffer[InputRecord] = ListBuffer()
     for (i <- 0 until 10) {
-      val sample: Array[Double] = Array(i.toDouble)
-//      data += new InputRecord(new util.ArrayList[Double](), new ArrayRealVector(sample))
+      val sample: Double = i.toDouble
+      val input_record: InputRecord = InputRecord(
+        id = "zScoreTest",
+        timestamp = "1998-01-01T22:07:58",
+        value = sample,
+        dimensions = Map("sm_type" -> Dimension("sm_type", "OVERNIGHT", "delivery", 1)),
+        dimensions_hierarchy = Map[ChildDimension, ParentDimension]()
+      )
+      data += input_record
     }
 
-    val sample: Array[Double] = Array(20.0)
-//    data += new InputRecord(new java.util.ArrayList[Double](), new ArrayRealVector(sample))
+    val sample: Double = 20.0
+    val input_record: InputRecord = InputRecord(
+      id = "zScoreTest",
+      timestamp = "1998-01-01T22:07:58",
+      value = sample,
+      dimensions = Map("sm_type" -> Dimension("sm_type", "OVERNIGHT", "delivery", 1)),
+      dimensions_hierarchy = Map[ChildDimension, ParentDimension]()
+    )
+    data += input_record
 
     m.train(data.toList)
     assertEquals(5.0, m.score(data.last), 1e-5)

@@ -2,7 +2,6 @@ package utils.stats
 
 import models.InputRecord
 import scala.util.Sorting
-import scala.collection.mutable.ArrayBuffer
 class MAD {
   private var median: Double = _
   private var MAD: Double = _
@@ -31,15 +30,15 @@ class MAD {
         }
       }
 
-    var residuals = new ArrayBuffer[Double]()
+    val residuals = new Array[Double](len)
     i = 0
     while (i < len)
     {
-      residuals += math.abs(metrics(i) - median)
+      residuals(i) = math.abs(metrics(i) - median)
       i += 1
     }
 
-    Sorting.quickSort(residuals.toArray)
+    Sorting.quickSort(residuals)
 
     MAD =
     {
