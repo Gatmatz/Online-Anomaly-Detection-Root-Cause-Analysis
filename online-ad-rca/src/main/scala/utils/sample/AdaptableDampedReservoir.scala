@@ -17,5 +17,5 @@ class AdaptableDampedReservoir[T](capacity:Int, bias:Double, random: Random = ne
     decayWeights(math.pow(1 - bias, numPeriods))
   }
 
-  override def insert(record: T, weight: Double): Unit = super.insert(record, 1)
+  def insert(record: T): Unit = super.insert(record, 1)
 }
