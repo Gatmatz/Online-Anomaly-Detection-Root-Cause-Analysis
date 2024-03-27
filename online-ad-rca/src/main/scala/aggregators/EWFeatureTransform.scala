@@ -1,4 +1,5 @@
-import models.{InputRecord, InputRecordWithNorm}
+package aggregators
+import models.{AggregatedRecordsWBaseline, InputRecord, InputRecordWithNorm}
 import org.apache.flink.api.common.functions.RichFlatMapFunction
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.util.Collector
@@ -24,26 +25,31 @@ class EWFeatureTransform(sampleSize: Int,
   private var decayer: Periodic = _
 
   override def open(parameters: Configuration): Unit = {
-    scorer = new MAD() // Assuming BatchTrainScore is instantiated properly
+    scorer = new MAD()
     reservoir = new AdaptableDampedReservoir[InputRecord](sampleSize, decayRate, random)
     warmupInput = ListBuffer.empty
-    retrainer = new Periodic(decayPeriod, reservoir.advancePeriod()) // Assuming Periodic is implemented properly
-    decayer = new Periodic(trainingPeriod, () => scorer.train(reservoir.getReservoir)) // Assuming Periodic is implemented properly
+    retrainer = new Periodic(decayPeriod, reservoir.advancePeriod())
+    decayer = new Periodic(trainingPeriod, () => scorer.train(reservoir.getReservoir))
   }
 
   override def flatMap(value: InputRecord, out: Collector[InputRecordWithNorm]): Unit = {
     tupleCount += 1
 
-    if (tupleCount < warmupCount) {
+    if (tupleCount < warmupCount)
+    {
       warmupInput += value
       reservoir.insert(value)
       retrainer.runIfNecessary()
       decayer.runIfNecessary()
-    } else {
-      if (tupleCount == warmupCount) {
-        scorer.train(reservoir.getReservoir())
-        for (di <- warmupInput) {
-          out.collect(InputRecordWithNorm(di, scorer.score(di)))
+    }
+    else
+    {
+      if (tupleCount == warmupCount)
+      {
+        scorer.train(reservoir.getReservoir)
+        for (di <- warmupInput)
+        {
+          out.collect(new InputRecordWithNorm(di, scorer.score(di)))
         }
         warmupInput.clear()
       }
@@ -51,7 +57,7 @@ class EWFeatureTransform(sampleSize: Int,
       retrainer.runIfNecessary()
       decayer.runIfNecessary()
       reservoir.insert(value)
-      out.collect(InputRecordWithNorm(value, scorer.score(value)))
+      out.collect(new InputRecordWithNorm(value,scorer.score(value)))
     }
   }
 

@@ -9,7 +9,7 @@ case class AggregatedRecordsWBaseline(
                                        baseline_dimensions_breakdown: Map[Dimension, MetricValue],
                                        dimensions_hierarchy: Map[ChildDimension, ParentDimension],
                                        records_in_baseline_offset: Int
-                                     ) {
+                                     ) extends Record {
   override def toString = {
     "AggregatedRecordsWBaseline(current=%s, baseline=%s, current_dimensions_breakdown=%s, baseline_dimensions_breakdown=%s, dimensions_hierarchy=%s, records_in_baseline_offset=%s)".format(
       current,
