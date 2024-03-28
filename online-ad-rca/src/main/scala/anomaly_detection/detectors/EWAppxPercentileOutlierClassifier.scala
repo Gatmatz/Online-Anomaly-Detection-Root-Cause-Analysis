@@ -20,18 +20,15 @@ class EWAppxPercentileOutlierClassifier extends AnomalyDetector[EWAppxPercentile
 
   override def runDetection(inputStream: DataStream[InputRecord]): DataStream[AnomalyEvent] =
   {
-    val featureTransform = new EWFeatureTransform(sampleSize = 100,
-                                                  decayRate = 0.5,
-                                                  decayPeriod = 10.0,
-                                                  trainingPeriod = 20.0,
-                                                  warmupCount = 50)
+    val featureTransform = new EWFeatureTransform(spec)
 
     // Apply the feature transformation to the input stream
     val inputRecordsWithNorm: DataStream[InputRecordWithNorm] = inputStream
       .flatMap(featureTransform)
+    inputRecordsWithNorm.print()
 
     val anomalyEventStream: DataStream[AnomalyEvent] = inputRecordsWithNorm
-      .filter(record => record.value > 10)
+      .filter(inputRecordsWithNorm => inputRecordsWithNorm.norm > 10)
       .map(record => AnomalyEvent(record))
 
     anomalyEventStream

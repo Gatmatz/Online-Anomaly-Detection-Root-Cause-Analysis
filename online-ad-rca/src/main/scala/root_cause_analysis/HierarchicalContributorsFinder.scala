@@ -25,9 +25,9 @@ class HierarchicalContributorsFinder extends ContributorsFinder {
   }
 
   def search(anomalyEvent: AnomalyEvent, dimensionGroup: String): RCAResult = {
-    val currentTotal = anomalyEvent.aggregatedRecordsWBaseline.current
-    val baselineTotal = anomalyEvent.aggregatedRecordsWBaseline.baseline
-
+    val aggregatedRecordsWBaseline: AggregatedRecordsWBaseline = anomalyEvent.aggregatedRecordsWBaseline.asInstanceOf[AggregatedRecordsWBaseline]
+    val currentTotal = aggregatedRecordsWBaseline.current
+    val baselineTotal =aggregatedRecordsWBaseline.baseline
     RCAResult(
       anomalyEvent.anomalyId,
       anomalyEvent.detectedAt,
@@ -37,9 +37,9 @@ class HierarchicalContributorsFinder extends ContributorsFinder {
       computeSummaries(
         currentTotal,
         baselineTotal,
-        anomalyEvent.aggregatedRecordsWBaseline.current_dimensions_breakdown,
-        anomalyEvent.aggregatedRecordsWBaseline.baseline_dimensions_breakdown,
-        anomalyEvent.aggregatedRecordsWBaseline.dimensions_hierarchy
+        aggregatedRecordsWBaseline.current_dimensions_breakdown,
+        aggregatedRecordsWBaseline.baseline_dimensions_breakdown,
+        aggregatedRecordsWBaseline.dimensions_hierarchy
       )
     )
   }
@@ -143,14 +143,16 @@ class HierarchicalContributorsFinder extends ContributorsFinder {
   }
 
   def keyByDimensionGroup(record: AnomalyEvent): Seq[(DimensionGroup, AnomalyEvent)] = {
+    val aggregatedRecordsWBaseline: AggregatedRecordsWBaseline = record.aggregatedRecordsWBaseline.asInstanceOf[AggregatedRecordsWBaseline]
+
     // get all dimension groups present in this record
-    val dimensionGroups = record.aggregatedRecordsWBaseline.current_dimensions_breakdown.keySet.map(_.group) ++ record.aggregatedRecordsWBaseline.baseline_dimensions_breakdown.keySet.map(_.group)
+    val dimensionGroups = aggregatedRecordsWBaseline.current_dimensions_breakdown.keySet.map(_.group) ++ aggregatedRecordsWBaseline.baseline_dimensions_breakdown.keySet.map(_.group)
 
     // create a AggregatedRecordsWBaseline record for each dimension group
     dimensionGroups.map(group => {
-      val groupCurrentDimensionsBreakdown = record.aggregatedRecordsWBaseline.current_dimensions_breakdown.filterKeys(_.group == group)
-      val groupBaselineDimensionsBreakdown = record.aggregatedRecordsWBaseline.baseline_dimensions_breakdown.filterKeys(_.group == group)
-      val groupDimensionsHierarchies = record.aggregatedRecordsWBaseline.dimensions_hierarchy.filterKeys(_.group == group)
+      val groupCurrentDimensionsBreakdown = aggregatedRecordsWBaseline.current_dimensions_breakdown.filterKeys(_.group == group)
+      val groupBaselineDimensionsBreakdown = aggregatedRecordsWBaseline.baseline_dimensions_breakdown.filterKeys(_.group == group)
+      val groupDimensionsHierarchies = aggregatedRecordsWBaseline.dimensions_hierarchy.filterKeys(_.group == group)
 
       (group,
         AnomalyEvent(
@@ -158,12 +160,12 @@ class HierarchicalContributorsFinder extends ContributorsFinder {
           record.detectedAt,
           record.epoch,
           AggregatedRecordsWBaseline(
-            record.aggregatedRecordsWBaseline.current,
-            record.aggregatedRecordsWBaseline.baseline,
+            aggregatedRecordsWBaseline.current,
+            aggregatedRecordsWBaseline.baseline,
             groupCurrentDimensionsBreakdown,
             groupBaselineDimensionsBreakdown,
             groupDimensionsHierarchies,
-            record.aggregatedRecordsWBaseline.records_in_baseline_offset
+            aggregatedRecordsWBaseline.records_in_baseline_offset
           )
         )
       )

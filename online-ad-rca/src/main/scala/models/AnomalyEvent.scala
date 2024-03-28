@@ -7,23 +7,34 @@ case class AnomalyEvent(
                          anomalyId: String,
                          detectedAt: LocalDateTime,
                          epoch: Long,
-                         aggregatedOrNormRecords: Record
+                         aggregatedRecordsWBaseline: Record
                        ) {
 
-  override def toString = {
-    "AnomalyEvent(anomalyId=%s, detectedAt=%s, aggregatedRecordsWBaseline=%s)".format(anomalyId, detectedAt.toString, aggregatedOrNormRecords)
+  override def toString: String = {
+    "AnomalyEvent(anomalyId=%s, detectedAt=%s, aggregatedRecordsWBaseline=%s)".format(anomalyId, detectedAt.toString, aggregatedRecordsWBaseline)
   }
 }
 
 object AnomalyEvent {
-  def apply(aggregatedOrNormRecords: Record): AnomalyEvent = {
+  def apply(aggregatedRecordsWBaseline: AggregatedRecordsWBaseline): AnomalyEvent = {
     val detectedAt: LocalDateTime = LocalDateTime.now(ZoneOffset.UTC)
 
     AnomalyEvent(
       anomalyId = UUID.randomUUID().toString,
       detectedAt = detectedAt,
       epoch = detectedAt.toEpochSecond(ZoneOffset.UTC),
-      aggregatedOrNormRecords = aggregatedOrNormRecords
+      aggregatedRecordsWBaseline = aggregatedRecordsWBaseline
+    )
+  }
+
+  def apply(aggregatedRecordsWBaseline: InputRecordWithNorm): AnomalyEvent = {
+    val detectedAt: LocalDateTime = LocalDateTime.now(ZoneOffset.UTC)
+
+    AnomalyEvent(
+      anomalyId = UUID.randomUUID().toString,
+      detectedAt = detectedAt,
+      epoch = detectedAt.toEpochSecond(ZoneOffset.UTC),
+      aggregatedRecordsWBaseline = aggregatedRecordsWBaseline
     )
   }
 }

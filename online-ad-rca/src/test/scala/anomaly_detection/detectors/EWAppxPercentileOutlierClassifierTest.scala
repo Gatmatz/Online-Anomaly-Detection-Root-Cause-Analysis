@@ -1,20 +1,16 @@
 package anomaly_detection.detectors
 
-import aggregators.OffsetBaselineAggregator
-import aggregators.metric_aggregators.SumAggregator
 import config.AppConfig
-import models.{AggregatedRecords, InputRecord}
-import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment, createTypeInformation}
-import org.apache.flink.streaming.api.windowing.assigners.{SlidingEventTimeWindows, TumblingEventTimeWindows}
-import org.apache.flink.streaming.api.windowing.time.Time
+import models.InputRecord
+import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment}
 import org.scalatest.flatspec.AnyFlatSpec
 import sources.kafka.InputRecordStreamBuilder
 
-class ThresholdDetectorTest extends AnyFlatSpec{
+class EWAppxPercentileOutlierClassifierTest extends AnyFlatSpec{
   val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
   AppConfig.enableCheckpoints(env)
 
-  "test threshold detector" should "detect anomalies" in {
+  "test EWAppxPercentile detector" should "detect anomalies" in {
     val spec: ThresholdDetectorSpec = new ThresholdDetectorSpec()
 
     spec.min = 3000.0f
@@ -32,4 +28,5 @@ class ThresholdDetectorTest extends AnyFlatSpec{
 
     env.execute("ThresholdDetector test")
   }
+
 }

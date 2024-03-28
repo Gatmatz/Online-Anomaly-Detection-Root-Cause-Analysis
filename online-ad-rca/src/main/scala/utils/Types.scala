@@ -10,4 +10,5 @@ package object Types {
   type MetricValue = Double
   type ChildDimension = Dimension
   type ParentDimension = Dimension
+  type PeriodType = String
 }

@@ -1,7 +1,7 @@
 package root_cause_analysis
 
 import config.AppConfig
-import models.{AnomalyEvent, Dimension, DimensionSummary, RCAResult}
+import models.{AggregatedRecordsWBaseline, AnomalyEvent, Dimension, DimensionSummary, RCAResult}
 import org.apache.flink.streaming.api.scala.{DataStream, createTypeInformation}
 import utils.Types.MetricValue
 
@@ -9,7 +9,7 @@ class SimpleContributorsFinder extends ContributorsFinder {
   /**
    * Similar logic to computeStats method of Startree Thirdeye
    * thirdeye-plugins/thirdeye-contributors-simple/src/main/java/ai/startree/thirdeye/plugins/rca/contributors/simple/SimpleContributorsFinder.java
-   * @param aggregatedRecordsWBaseline
+   * @param anomalyStream input stream
    */
 
   override def runSearch(anomalyStream: DataStream[AnomalyEvent]): DataStream[RCAResult] = {
@@ -18,8 +18,10 @@ class SimpleContributorsFinder extends ContributorsFinder {
   }
 
   def search(anomalyEvent: AnomalyEvent, dimensionGroup: String = "all"): RCAResult = {
-    val currentTotal = anomalyEvent.aggregatedRecordsWBaseline.current
-    val baselineTotal = anomalyEvent.aggregatedRecordsWBaseline.baseline
+    val aggregatedRecordsWBaseline: AggregatedRecordsWBaseline = anomalyEvent.aggregatedRecordsWBaseline.asInstanceOf[AggregatedRecordsWBaseline]
+
+    val currentTotal = aggregatedRecordsWBaseline.current
+    val baselineTotal = aggregatedRecordsWBaseline.baseline
 
     RCAResult(
       anomalyEvent.anomalyId,
@@ -30,8 +32,8 @@ class SimpleContributorsFinder extends ContributorsFinder {
       computeSummaries(
         currentTotal,
         baselineTotal,
-        anomalyEvent.aggregatedRecordsWBaseline.current_dimensions_breakdown,
-        anomalyEvent.aggregatedRecordsWBaseline.baseline_dimensions_breakdown
+        aggregatedRecordsWBaseline.current_dimensions_breakdown,
+        aggregatedRecordsWBaseline.baseline_dimensions_breakdown
       )
     )
   }

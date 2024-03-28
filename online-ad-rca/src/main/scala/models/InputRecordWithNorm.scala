@@ -7,9 +7,9 @@ import utils.Types.{ChildDimension, DimensionName, ParentDimension}
 
 case class InputRecordWithNorm(
                                 record: InputRecord,
-                                norm: Double
+                                norm: Double,
                               ) extends Record {
-  override def toString = {
+  override def toString: String = {
     "InputRecordWithNorm(id=%s, created_at=%s, value=%s, dimensions=%s, dimensions_hierarchy=%s, norm=%s)".format(record.id, record.timestamp, record.value, record.dimensions, record.dimensions_hierarchy, norm)
   }
 }
