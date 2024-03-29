@@ -1,4 +1,11 @@
 package utils
+
+/**
+ * Auxiliary class used for Macrobase' functionalities.
+ * @param periodType Tuple or Time based periods.
+ * @param periodLength The length of the Period
+ * @param task A Runnable task to be executed on certain Periods
+ */
 class Periodic(periodType: Types.PeriodType,
                periodLength: Double,
                task: Runnable) {

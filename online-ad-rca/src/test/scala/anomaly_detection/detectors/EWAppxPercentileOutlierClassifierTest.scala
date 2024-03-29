@@ -10,23 +10,22 @@ class EWAppxPercentileOutlierClassifierTest extends AnyFlatSpec{
   val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
   AppConfig.enableCheckpoints(env)
 
-  "test EWAppxPercentile detector" should "detect anomalies" in {
-    val spec: ThresholdDetectorSpec = new ThresholdDetectorSpec()
-
-    spec.min = 3000.0f
-    spec.max = 5000.0f
-    spec.aggregationWindowSize = 30
-    spec.elementsInBaselineOffsetWindow = 10
-
-    val detector: ThresholdDetector = new ThresholdDetector()
-    detector.init(spec)
+  "test EWAppxPercentile detector" should "should detect Anomalies" in {
+    val spec: EWAppxPercentileOutlierClassifierSpec = new EWAppxPercentileOutlierClassifierSpec()
+    spec.warmupCount = 100
+    spec.sampleSize = 1000
+    spec.decayPeriodType = "TUPLE_BASED"
+    spec.decayPeriod = 10
+    spec.decayRate = 0.01
+    spec.trainingPeriodType = "TUPLE_BASED"
+    spec.trainingPeriod = 10
+    spec.percentile = 0.9
 
     val inputStream: DataStream[InputRecord] = InputRecordStreamBuilder.buildInputRecordStream(env)
+    val detector: EWAppxPercentileOutlierClassifier = new EWAppxPercentileOutlierClassifier()
+    detector.init(spec)
 
-    detector.runDetection(inputStream)
-      .print()
-
-    env.execute("ThresholdDetector test")
+    detector.runDetection(inputStream).print()
+    env.execute("EWAppxPercentile test")
   }
-
 }

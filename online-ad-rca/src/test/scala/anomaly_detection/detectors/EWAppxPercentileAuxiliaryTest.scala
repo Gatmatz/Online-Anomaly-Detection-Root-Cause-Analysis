@@ -1,18 +1,18 @@
-package aggregators
+package anomaly_detection.detectors
 
-import anomaly_detection.detectors.EWAppxPercentileOutlierClassifierSpec
+import aggregators.EWFeatureTransform
 import config.AppConfig
 import models.{AggregatedRecordsWBaseline, InputRecord}
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment, createTypeInformation}
 import org.scalatest.flatspec.AnyFlatSpec
 import sources.kafka.InputRecordStreamBuilder
 
-class EWFeatureTransformTest extends AnyFlatSpec
+class EWAppxPercentileAuxiliaryTest extends AnyFlatSpec
 {
   val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
   AppConfig.enableCheckpoints(env)
 
-  "test EWFeatureTransform" should "score InputRecords" in {
+  "test EWAppxPercentileAuxiliary" should "create tuples of Anomaly detection" in {
     val spec: EWAppxPercentileOutlierClassifierSpec = new EWAppxPercentileOutlierClassifierSpec()
     spec.warmupCount = 100
     spec.sampleSize = 1000
@@ -21,16 +21,21 @@ class EWFeatureTransformTest extends AnyFlatSpec
     spec.decayRate = 0.01
     spec.trainingPeriodType = "TUPLE_BASED"
     spec.trainingPeriod = 10
+    spec.percentile = 0.9
 
     val inputStream: DataStream[InputRecord] = InputRecordStreamBuilder.buildInputRecordStream(env)
 
     val featureTransform = new EWFeatureTransform(spec)
 
-    val inputRecordsWithNorm: DataStream[AggregatedRecordsWBaseline] = inputStream
+    val aggregatedRecords: DataStream[AggregatedRecordsWBaseline] = inputStream
       .flatMap(featureTransform)
 
-    inputRecordsWithNorm.print()
+    val detector = new EWAppxPercentileAuxiliary(spec)
 
-    env.execute("EWFeatureTransform test")
+    val anomalyEventStream: DataStream[(AggregatedRecordsWBaseline, Boolean)] = aggregatedRecords
+      .flatMap(detector)
+
+    anomalyEventStream.print()
+    env.execute("EWAppxPercentileOutlierDetector test")
   }
 }

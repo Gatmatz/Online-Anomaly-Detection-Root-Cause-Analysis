@@ -3,6 +3,10 @@ package anomaly_detection.detectors
 import anomaly_detection.AbstractDetectorSpec
 import utils.Types
 
+/**
+ * Exponentially weighted approximate percentile-based streaming classifier from Macrobase.
+ * This class contains the specification of the model's training and AD detection.
+ */
 class EWAppxPercentileOutlierClassifierSpec extends AbstractDetectorSpec
 {
   //EWFeature Transformer Settings
@@ -15,4 +19,5 @@ class EWAppxPercentileOutlierClassifierSpec extends AbstractDetectorSpec
   var trainingPeriod: Double = 0.0
 
   //Anomaly Detector Settings
+  var percentile: Double = 0.0
 }

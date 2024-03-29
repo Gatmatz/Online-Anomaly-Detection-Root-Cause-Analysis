@@ -1,12 +1,8 @@
 package anomaly_detection.detectors
 
-import aggregators.OffsetBaselineAggregator
-import aggregators.metric_aggregators.SumAggregator
 import config.AppConfig
-import models.{AggregatedRecords, InputRecord}
-import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment, createTypeInformation}
-import org.apache.flink.streaming.api.windowing.assigners.{SlidingEventTimeWindows, TumblingEventTimeWindows}
-import org.apache.flink.streaming.api.windowing.time.Time
+import models.InputRecord
+import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment}
 import org.scalatest.flatspec.AnyFlatSpec
 import sources.kafka.InputRecordStreamBuilder
 

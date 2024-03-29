@@ -2,44 +2,45 @@ package anomaly_detection.detectors
 
 import aggregators.EWFeatureTransform
 import anomaly_detection.AnomalyDetector
-import models.{AnomalyEvent, InputRecord, InputRecordWithNorm}
+import models.{AggregatedRecordsWBaseline, AnomalyEvent, InputRecord}
 import org.apache.flink.streaming.api.scala.{DataStream, createTypeInformation}
-import utils.sample.AdaptableDampedReservoir
 
-import scala.util.Random
-
+/**
+ * Exponentially weighted approximate percentile-based streaming classifier from Macrobase.
+ * This class performs the whole anomaly detection process.
+ */
 class EWAppxPercentileOutlierClassifier extends AnomalyDetector[EWAppxPercentileOutlierClassifierSpec]{
   private var spec: EWAppxPercentileOutlierClassifierSpec = _
-  private var reservoir: AdaptableDampedReservoir[InputRecordWithNorm] = _
-  private var currentThreshold: Double = 0.0
   override def init(spec: EWAppxPercentileOutlierClassifierSpec): Unit =
   {
     this.spec = spec
-    reservoir = new AdaptableDampedReservoir[InputRecordWithNorm](spec.sampleSize,spec.decayRate,new Random())
   }
 
   override def runDetection(inputStream: DataStream[InputRecord]): DataStream[AnomalyEvent] =
   {
+    // Initialize the MAD trainer
     val featureTransform = new EWFeatureTransform(spec)
 
-    // Apply the feature transformation to the input stream
-    val inputRecordsWithNorm: DataStream[InputRecordWithNorm] = inputStream
+    // Train MAD using ADR and assign scores to every InputRecord
+    val inputStreamWithNorm: DataStream[AggregatedRecordsWBaseline] = inputStream
       .flatMap(featureTransform)
-    inputRecordsWithNorm.print()
 
-    val anomalyEventStream: DataStream[AnomalyEvent] = inputRecordsWithNorm
-      .filter(inputRecordsWithNorm => inputRecordsWithNorm.norm > 10)
-      .map(record => AnomalyEvent(record))
+    // Initialize the AD Detector
+    val detector = new EWAppxPercentileAuxiliary(spec)
+
+    // The AD detector will use ADR to create tuples of (Record, isAnomaly), where isAnomaly is a Boolean variable
+    // indicating if the Record is an Anomaly or not.
+    // The Anomalies are filtered and then they are translated to AnomalyEvent instances.
+    val anomalyEventStream: DataStream[AnomalyEvent] = inputStreamWithNorm
+      .flatMap(detector)  // Detect each AggregatedRecordWBaseline to Anomaly or Not
+      .filter(_._2)   // Filter out the Normal Points
+      .map {
+        // Specify types explicitly
+        (tuple: (AggregatedRecordsWBaseline, Boolean)) =>
+          val (record, _) = tuple
+          AnomalyEvent(record)
+      }
 
     anomalyEventStream
   }
-
-
-  private def updateThreshold(percentile: Double): Unit = {
-    val norms: List[InputRecordWithNorm] = reservoir.getReservoir
-    val sortedNorms = norms.sortBy(_.norm)
-    val index = (percentile * norms.size).toInt
-    currentThreshold = sortedNorms(index).norm
-  }
-
 }

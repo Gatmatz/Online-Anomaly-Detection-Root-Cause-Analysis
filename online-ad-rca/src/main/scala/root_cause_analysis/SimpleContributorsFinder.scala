@@ -18,10 +18,9 @@ class SimpleContributorsFinder extends ContributorsFinder {
   }
 
   def search(anomalyEvent: AnomalyEvent, dimensionGroup: String = "all"): RCAResult = {
-    val aggregatedRecordsWBaseline: AggregatedRecordsWBaseline = anomalyEvent.aggregatedRecordsWBaseline.asInstanceOf[AggregatedRecordsWBaseline]
 
-    val currentTotal = aggregatedRecordsWBaseline.current
-    val baselineTotal = aggregatedRecordsWBaseline.baseline
+    val currentTotal = anomalyEvent.aggregatedRecordsWBaseline.current
+    val baselineTotal = anomalyEvent.aggregatedRecordsWBaseline.baseline
 
     RCAResult(
       anomalyEvent.anomalyId,
@@ -32,8 +31,8 @@ class SimpleContributorsFinder extends ContributorsFinder {
       computeSummaries(
         currentTotal,
         baselineTotal,
-        aggregatedRecordsWBaseline.current_dimensions_breakdown,
-        aggregatedRecordsWBaseline.baseline_dimensions_breakdown
+        anomalyEvent.aggregatedRecordsWBaseline.current_dimensions_breakdown,
+        anomalyEvent.aggregatedRecordsWBaseline.baseline_dimensions_breakdown
       )
     )
   }
