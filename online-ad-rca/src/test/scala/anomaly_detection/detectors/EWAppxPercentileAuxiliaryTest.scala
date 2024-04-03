@@ -1,9 +1,12 @@
 package anomaly_detection.detectors
 
-import aggregators.EWFeatureTransform
+import aggregators.metric_aggregators.SumAggregator
+import aggregators.{EWFeatureTransform, OffsetBaselineAggregator}
 import config.AppConfig
-import models.{AggregatedRecordsWBaseline, InputRecord}
+import models.{AggregatedRecords, AggregatedRecordsWBaseline, InputRecord}
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment, createTypeInformation}
+import org.apache.flink.streaming.api.windowing.assigners.SlidingEventTimeWindows
+import org.apache.flink.streaming.api.windowing.time.Time
 import org.scalatest.flatspec.AnyFlatSpec
 import sources.kafka.InputRecordStreamBuilder
 
@@ -23,16 +26,30 @@ class EWAppxPercentileAuxiliaryTest extends AnyFlatSpec
     spec.trainingPeriod = 10
     spec.percentile = 0.9
 
+    //Input Stream
     val inputStream: DataStream[InputRecord] = InputRecordStreamBuilder.buildInputRecordStream(env)
 
+    // Aggregation
+    val aggregatedRecordsStream: DataStream[AggregatedRecords] = inputStream
+      .assignAscendingTimestamps(_.epoch)
+      .windowAll(SlidingEventTimeWindows.of(Time.seconds(spec.aggregationWindowSize), Time.seconds(spec.aggregationWindowSlide)))
+      .aggregate(new SumAggregator)
+
+    // Baseline generation
+    val aggregatedRecordsWBaselineStream: DataStream[AggregatedRecordsWBaseline] = aggregatedRecordsStream
+      .countWindowAll(spec.elementsInBaselineOffsetWindow, 1)
+      .aggregate(new OffsetBaselineAggregator)
+
+    // MAD training
     val featureTransform = new EWFeatureTransform(spec)
 
-    val aggregatedRecords: DataStream[AggregatedRecordsWBaseline] = inputStream
+    val aggregatedRecordsWScore: DataStream[(AggregatedRecordsWBaseline, Double)] = aggregatedRecordsWBaselineStream
       .flatMap(featureTransform)
 
+    // Anomaly Detection
     val detector = new EWAppxPercentileAuxiliary(spec)
 
-    val anomalyEventStream: DataStream[(AggregatedRecordsWBaseline, Boolean)] = aggregatedRecords
+    val anomalyEventStream: DataStream[(AggregatedRecordsWBaseline, Boolean)] = aggregatedRecordsWScore
       .flatMap(detector)
 
     anomalyEventStream.print()

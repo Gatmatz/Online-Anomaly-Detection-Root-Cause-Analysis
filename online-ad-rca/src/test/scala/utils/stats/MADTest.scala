@@ -1,8 +1,6 @@
-import models.{Dimension, InputRecord}
-import org.apache.commons.math3.linear.ArrayRealVector
+import models.AggregatedRecordsWBaseline
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import utils.Types.{ChildDimension, ParentDimension}
 import utils.stats.MAD
 
 import scala.collection.mutable.ListBuffer
@@ -12,14 +10,10 @@ class MADTest {
   def simpleTest(): Unit = {
     val m: MAD = new MAD()
 
-    val data: ListBuffer[InputRecord] = ListBuffer.empty[InputRecord]
+    val data: ListBuffer[AggregatedRecordsWBaseline] = ListBuffer.empty[AggregatedRecordsWBaseline]
     for (i <- 0 until 100) {
-      val input_record: InputRecord = InputRecord(
-        id = "simpleTest",
-        timestamp = "1998-01-01T22:07:58",
-        value = i,
-        dimensions = Map("sm_type" -> Dimension("sm_type", "OVERNIGHT", "delivery", 1)),
-        dimensions_hierarchy = Map[ChildDimension, ParentDimension]()
+      val input_record: AggregatedRecordsWBaseline = AggregatedRecordsWBaseline(
+        i, i, null, null, null, 1
       )
       data += input_record
     }
@@ -33,15 +27,11 @@ class MADTest {
   def zeroMADTest(): Unit = {
     val m: MAD = new MAD()
 
-    val data: ListBuffer[InputRecord] = ListBuffer()
+    val data: ListBuffer[AggregatedRecordsWBaseline] = ListBuffer()
     for (i <- 0 until 30) {
       val sample: Double = if (i == 0 || i >= 28) 5.0 else 10.0
-      val input_record: InputRecord = InputRecord(
-        id = "zeroMADTest",
-        timestamp = "1998-01-01T22:07:58",
-        value = sample,
-        dimensions = Map("sm_type" -> Dimension("sm_type", "OVERNIGHT", "delivery", 1)),
-        dimensions_hierarchy = Map[ChildDimension, ParentDimension]()
+      val input_record: AggregatedRecordsWBaseline = AggregatedRecordsWBaseline(
+        sample, sample, null, null, null, 1
       )
       data += input_record
     }
@@ -55,26 +45,18 @@ class MADTest {
   def zScoreTest(): Unit = {
     val m: MAD = new MAD()
 
-    val data: ListBuffer[InputRecord] = ListBuffer()
+    val data: ListBuffer[AggregatedRecordsWBaseline] = ListBuffer()
     for (i <- 0 until 10) {
       val sample: Double = i.toDouble
-      val input_record: InputRecord = InputRecord(
-        id = "zScoreTest",
-        timestamp = "1998-01-01T22:07:58",
-        value = sample,
-        dimensions = Map("sm_type" -> Dimension("sm_type", "OVERNIGHT", "delivery", 1)),
-        dimensions_hierarchy = Map[ChildDimension, ParentDimension]()
+      val input_record: AggregatedRecordsWBaseline = AggregatedRecordsWBaseline(
+        sample, sample, null, null, null, 1
       )
       data += input_record
     }
 
     val sample: Double = 20.0
-    val input_record: InputRecord = InputRecord(
-      id = "zScoreTest",
-      timestamp = "1998-01-01T22:07:58",
-      value = sample,
-      dimensions = Map("sm_type" -> Dimension("sm_type", "OVERNIGHT", "delivery", 1)),
-      dimensions_hierarchy = Map[ChildDimension, ParentDimension]()
+    val input_record: AggregatedRecordsWBaseline = AggregatedRecordsWBaseline(
+      sample, sample, null, null, null, 1
     )
     data += input_record
 

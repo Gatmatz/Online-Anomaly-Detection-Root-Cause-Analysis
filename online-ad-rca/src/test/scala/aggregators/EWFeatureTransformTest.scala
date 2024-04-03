@@ -1,9 +1,12 @@
 package aggregators
 
+import aggregators.metric_aggregators.SumAggregator
 import anomaly_detection.detectors.EWAppxPercentileOutlierClassifierSpec
 import config.AppConfig
-import models.{AggregatedRecordsWBaseline, InputRecord}
+import models.{AggregatedRecords, AggregatedRecordsWBaseline, InputRecord}
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment, createTypeInformation}
+import org.apache.flink.streaming.api.windowing.assigners.SlidingEventTimeWindows
+import org.apache.flink.streaming.api.windowing.time.Time
 import org.scalatest.flatspec.AnyFlatSpec
 import sources.kafka.InputRecordStreamBuilder
 
@@ -12,7 +15,7 @@ class EWFeatureTransformTest extends AnyFlatSpec
   val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
   AppConfig.enableCheckpoints(env)
 
-  "test EWFeatureTransform" should "score InputRecords" in {
+  "test EWFeatureTransform" should "score AggregatedRecords" in {
     val spec: EWAppxPercentileOutlierClassifierSpec = new EWAppxPercentileOutlierClassifierSpec()
     spec.warmupCount = 100
     spec.sampleSize = 1000
@@ -24,9 +27,19 @@ class EWFeatureTransformTest extends AnyFlatSpec
 
     val inputStream: DataStream[InputRecord] = InputRecordStreamBuilder.buildInputRecordStream(env)
 
+    val aggregatedRecordsStream: DataStream[AggregatedRecords] = inputStream
+      .assignAscendingTimestamps(_.epoch)
+      .windowAll(SlidingEventTimeWindows.of(Time.seconds(spec.aggregationWindowSize), Time.seconds(spec.aggregationWindowSlide)))
+      .aggregate(new SumAggregator)
+
+    // Baseline generation
+    val aggregatedRecordsWBaselineStream: DataStream[AggregatedRecordsWBaseline] = aggregatedRecordsStream
+      .countWindowAll(spec.elementsInBaselineOffsetWindow, 1)
+      .aggregate(new OffsetBaselineAggregator)
+
     val featureTransform = new EWFeatureTransform(spec)
 
-    val inputRecordsWithNorm: DataStream[AggregatedRecordsWBaseline] = inputStream
+    val inputRecordsWithNorm: DataStream[(AggregatedRecordsWBaseline, Double)] = aggregatedRecordsWBaselineStream
       .flatMap(featureTransform)
 
     inputRecordsWithNorm.print()

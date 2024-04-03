@@ -1,6 +1,7 @@
 package utils.stats
 
-import models.InputRecord
+import models.{AggregatedRecordsWBaseline, InputRecord}
+
 import scala.util.Sorting
 class MAD {
   private var median: Double = _
@@ -9,13 +10,13 @@ class MAD {
   private val trimmedMeanFallback: Double = 0.05
   // https://en.wikipedia.org/wiki/Median_absolute_deviation#Relation_to_standard_deviation
   private val MAD_TO_ZSCORE_COEFFICIENT: Double = 1.4826
-  def train(data: List[InputRecord]): Unit =
+  def train(data: List[AggregatedRecordsWBaseline]): Unit =
   {
     val len: Int = data.size
     val metrics: Array[Double] = new Array[Double](data.size)
     var i: Int = 0
     while (i < len) {
-      metrics(i) = data(i).value
+      metrics(i) = data(i).current
       i += 1
     }
 
@@ -63,8 +64,8 @@ class MAD {
     }
   }
 
-  def score(record: InputRecord): Double = {
-    val point: Double = record.value
+  def score(record: AggregatedRecordsWBaseline): Double = {
+    val point: Double = record.current
     math.abs(point - median) / MAD
   }
 
