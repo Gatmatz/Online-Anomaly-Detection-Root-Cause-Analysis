@@ -1,5 +1,6 @@
 package utils.itemset.FPTree
 
+import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.util.control.Breaks.{break, breakable}
 
@@ -8,12 +9,12 @@ import scala.util.control.Breaks.{break, breakable}
  * @param item the item associated with this node.
  * @param parent the node's parent node.
  * @param count count of occurrences of the Node.
+ * @param treeOfOrigin the StreamingFPTree the current Node belongs to
  */
-class FPTreeNode(item:Int, var parent: FPTreeNode, var count: Double) {
+class FPTreeNode(item:Int, var parent: FPTreeNode, var count: Double, treeOfOrigin: StreamingFPTree) {
   private var nextLink: FPTreeNode = _  // Points to the next node with the same item
   private var prevLink: FPTreeNode = _  // Points to the previous node with the same item
   private var children: ListBuffer[FPTreeNode] = _  // Represents the list of child nodes
-
 
   /**
    * Getter function for the node's item.
@@ -117,7 +118,7 @@ class FPTreeNode(item:Int, var parent: FPTreeNode, var count: Double) {
    * @param otherChildren a list of additional FPTreeNodes
    */
   def mergeChildren(otherChildren: ListBuffer[FPTreeNode]): Unit = {
-    assert(!hasChildren || !(StreamingFPTree.leafNodes.contains(this)))
+    assert(!hasChildren || !treeOfOrigin.leafNodes.contains(this))
 
     if (otherChildren == null)
     {
@@ -130,7 +131,7 @@ class FPTreeNode(item:Int, var parent: FPTreeNode, var count: Double) {
           child.parent = this
           child
         }
-        StreamingFPTree.leafNodes -= this
+        treeOfOrigin.leafNodes -= this
         return
       }
 
@@ -142,7 +143,7 @@ class FPTreeNode(item:Int, var parent: FPTreeNode, var count: Double) {
       breakable { // Use breakable to be able to break out of the loop
         for (ourChild <- children) {
           if (otherChild.getItem == ourChild.getItem) {
-            StreamingFPTree.removeNodeFromHeaders(otherChild)
+            treeOfOrigin.removeNodeFromHeaders(otherChild)
             ourChild.incrementCount(otherChild.getCount)
             ourChild.mergeChildren(otherChild.getChildren)
             matched = true
@@ -167,7 +168,12 @@ class FPTreeNode(item:Int, var parent: FPTreeNode, var count: Double) {
    * @param currentIndex the index of the transaction
    */
 
-  def insertTransaction(fullTransaction: List[Int], itemCount: Double ,currentIndex: Int): Unit = {
+  def insertTransaction(fullTransaction: List[Int], itemCount: Double ,currentIndex: Int, streaming: Boolean): Unit = {
+    if (!streaming)
+      {
+        treeOfOrigin.sortedNodes.add(this)
+      }
+
     incrementCount(itemCount)
 
     if (currentIndex == fullTransaction.size)
@@ -193,10 +199,15 @@ class FPTreeNode(item:Int, var parent: FPTreeNode, var count: Double) {
 
     if (matchingChild == null)
       {
-        matchingChild =  new FPTreeNode(currentItem, this, 0)
+        matchingChild =  new FPTreeNode(currentItem, this, 0, treeOfOrigin)
 
-        val prevHeader: FPTreeNode = StreamingFPTree.nodeHeaders(currentItem)
-        StreamingFPTree.nodeHeaders.put(currentItem, matchingChild)
+        if (!streaming)
+          {
+            treeOfOrigin.sortedNodes.add(matchingChild)
+          }
+
+        val prevHeader: FPTreeNode = treeOfOrigin.nodeHeaders.getOrElse(currentItem, null)
+        treeOfOrigin.nodeHeaders.put(currentItem, matchingChild)
 
         if (prevHeader != null)
           {
@@ -213,12 +224,12 @@ class FPTreeNode(item:Int, var parent: FPTreeNode, var count: Double) {
 
         if (currentIndex == (fullTransaction.size - 1))
           {
-            StreamingFPTree.leafNodes += matchingChild
+            treeOfOrigin.leafNodes += matchingChild
           }
 
-        StreamingFPTree.leafNodes -= this
+        treeOfOrigin.leafNodes -= this
       }
 
-    matchingChild.insertTransaction(fullTransaction, itemCount, currentIndex + 1)
+    matchingChild.insertTransaction(fullTransaction, itemCount, currentIndex + 1, streaming)
   }
 }
