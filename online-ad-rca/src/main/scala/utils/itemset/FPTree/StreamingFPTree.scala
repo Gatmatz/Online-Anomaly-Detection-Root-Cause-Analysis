@@ -122,6 +122,7 @@ class StreamingFPTree {
   }
 
   def insertFrequentItems(transactions: List[Set[Int]], countRequiredForSupport: Int): Unit = {
+    // Find the count of the items and store them in itemCounts HashMap
     val itemCounts = mutable.HashMap[Int, Double]()
     for (t <- transactions) {
       for (item <- t) {
@@ -129,6 +130,7 @@ class StreamingFPTree {
       }
     }
 
+    // Filter out the item that do no reach the minimum support
     itemCounts.filter {
         case (_, value) => value >= countRequiredForSupport
       }
@@ -140,7 +142,7 @@ class StreamingFPTree {
     // We have to materialize a canonical order so that items with equal counts
     // are consistently ordered when they are sorted during transaction insertion
     var sortedItemCounts = frequentItemCounts.toList
-    sortedItemCounts = sortedItemCounts.sortBy(entry => frequentItemCounts(entry._1))
+    sortedItemCounts = sortedItemCounts.sortBy(entry => (frequentItemCounts(entry._1), entry._1))
 
     // Populate the frequentItemOrder map
     sortedItemCounts.zipWithIndex.foreach { case ((key, _), index) =>
@@ -212,10 +214,9 @@ class StreamingFPTree {
 
   def sortTransaction(txn: List[Int], isStreaming: Boolean): Unit = {
     if (!isStreaming) {
-      txn.sortBy(i => -frequentItemOrder(i))
-    }
-    else {
-      txn.sortBy(i => -frequentItemOrder.getOrElseUpdate(i, -i))
+      txn.sortBy(i => -frequentItemOrder.getOrElse(i, Int.MinValue))
+    } else if (isStreaming) {
+      txn.sortBy(i => -frequentItemOrder.getOrElse(i, -i))
     }
   }
 

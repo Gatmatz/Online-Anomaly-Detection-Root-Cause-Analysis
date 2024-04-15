@@ -28,10 +28,10 @@ class StreamingFPGrowthTest {
       intIfy("b, c, k, s, p"),
       intIfy("a, f, c, e, l, p, m, n")
     )
-
     val fp = new StreamingFPGrowth(.2)
     fp.buildTree(allTxns)
     var itemsets = fp.getItemsets
+    printItemsets(itemsets)
 
     val newBatch = List(
       intIfy("a, b, c, d, e"),
@@ -47,4 +47,16 @@ class StreamingFPGrowthTest {
     assertEquals(797, itemsets.size)
   }
 
+  @Test
+  def simpleTest(): Unit = {
+    val allTxns = List(
+      intIfy("a, b, c"),
+      intIfy("a, b")
+    )
+
+    val fp = new StreamingFPGrowth(support = .5)
+    fp.buildTree(allTxns)
+    val itemsets = fp.getItemsets
+    println(itemsets.size)
+  }
 }
