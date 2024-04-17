@@ -212,10 +212,10 @@ class StreamingFPTree {
     updateFrequentItemOrder()
   }
 
-  def sortTransaction(txn: List[Int], isStreaming: Boolean): Unit = {
+  def sortTransaction(txn: List[Int], isStreaming: Boolean): List[Int] = {
     if (!isStreaming) {
-      txn.sortBy(i => -frequentItemOrder.getOrElse(i, Int.MinValue))
-    } else if (isStreaming) {
+      txn.sortBy(i => (-1) * frequentItemOrder.getOrElse(i, Int.MinValue))
+    } else {
       txn.sortBy(i => -frequentItemOrder.getOrElse(i, -i))
     }
   }
@@ -246,7 +246,7 @@ class StreamingFPTree {
         }
       }
 
-    val filtered: List[Int] = transaction.filter(frequentItemCounts.contains).toList
+    var filtered: List[Int] = transaction.filter(frequentItemCounts.contains).toList
 
     if (filtered.nonEmpty)
       {
@@ -257,7 +257,7 @@ class StreamingFPTree {
             }
           }
 
-        sortTransaction(filtered, streaming)
+        filtered = sortTransaction(filtered, streaming)
         root.insertTransaction(filtered, 1, 0, streaming)
       }
   }
@@ -296,8 +296,10 @@ class StreamingFPTree {
               break()
 
           if (curNode.getChildren != null && curNode.getChildren.size > 1)
+            {
               nodeOfBranching = curNode
               break()
+            }
 
           if (curNode != root)
               singlePathNodes += curNode

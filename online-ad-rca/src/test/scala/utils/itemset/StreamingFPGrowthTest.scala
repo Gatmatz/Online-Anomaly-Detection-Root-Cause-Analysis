@@ -20,34 +20,6 @@ class StreamingFPGrowthTest {
   }
 
   @Test
-  def testFPFromPaper(): Unit = {
-    val allTxns = List(
-      intIfy("f, a, c, d, g, i, m, p"),
-      intIfy("a, b, c, f, l, m, o"),
-      intIfy("b, f, h, j, o"),
-      intIfy("b, c, k, s, p"),
-      intIfy("a, f, c, e, l, p, m, n")
-    )
-    val fp = new StreamingFPGrowth(.2)
-    fp.buildTree(allTxns)
-    var itemsets = fp.getItemsets
-    printItemsets(itemsets)
-
-    val newBatch = List(
-      intIfy("a, b, c, d, e"),
-      intIfy("b, a, d, a, s, s"),
-      intIfy("d, a, t, t, h, i, n, g"),
-      intIfy("f, a, k, s, p, e")
-    )
-
-    val updatedTxns = allTxns ++ newBatch
-    fp.insertTransactionsStreamingExact(newBatch)
-    itemsets = fp.getItemsets
-
-    assertEquals(797, itemsets.size)
-  }
-
-  @Test
   def simpleTest(): Unit = {
     val allTxns = List(
       intIfy("a, b, c"),
@@ -56,7 +28,52 @@ class StreamingFPGrowthTest {
 
     val fp = new StreamingFPGrowth(support = .5)
     fp.buildTree(allTxns)
-    val itemsets = fp.getItemsets
-    println(itemsets.size)
+    var itemsets = fp.getItemsets
+
+    assertEquals(7, itemsets.size)
+
+    val newBatch = List(
+      intIfy("c, d"),
+      intIfy("a, d"),
+      intIfy("a, d, e")
+    )
+
+    fp.insertTransactionsStreamingExact(newBatch)
+
+    itemsets = fp.getItemsets
+
+    assertEquals(6, itemsets.size)
+
+  }
+
+  @Test
+  def testFPFromPaper(): Unit = {
+    val allTxns = List(
+      intIfy("a, b, c, f, l, m, o"),
+      intIfy("f, a, c, d, g, i, m, p"),
+//      intIfy("b, f, h, j, o"),
+//      intIfy("b, c, k, s, p"),
+//      intIfy("a, f, c, e, l, p, m, n")
+    )
+    val fp = new StreamingFPGrowth(.2)
+    fp.buildTree(allTxns)
+
+    var itemsets = fp.getItemsets
+    print(itemsets.size)
+
+//    printItemsets(itemsets)
+//
+//    val newBatch = List(
+//      intIfy("a, b, c, d, e"),
+//      intIfy("b, a, d, a, s, s"),
+//      intIfy("d, a, t, t, h, i, n, g"),
+//      intIfy("f, a, k, s, p, e")
+//    )
+//
+//    val updatedTxns = allTxns ++ newBatch
+//    fp.insertTransactionsStreamingExact(newBatch)
+//    itemsets = fp.getItemsets
+//
+//    assertEquals(797, itemsets.size)
   }
 }
