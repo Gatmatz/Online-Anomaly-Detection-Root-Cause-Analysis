@@ -345,18 +345,18 @@ class StreamingFPTree {
       alreadyMinedItems.add(node.getItem)
     }
 
-    for ((headerKey, headerValue) <- nodeHeaders) {
-      if (alreadyMinedItems.contains(headerKey) || frequentItemCounts.getOrElse(headerKey, 0.0) < supportCountRequired) {
+    for (key <- nodeHeaders) {
+      if (alreadyMinedItems.contains(key._1) || frequentItemCounts.getOrElse(key._1, -1.0) < supportCountRequired) {
 
       }
       else {
         // Add the singleton item set
-        branchingItemsets += new ItemsetWithCount(mutable.Set(headerKey), frequentItemCounts(headerKey))
+        branchingItemsets += new ItemsetWithCount(mutable.Set(key._1), frequentItemCounts(key._1))
 
         val conditionalPatternBase = mutable.ListBuffer.empty[ItemsetWithCount]
 
         // Walk each "leaf" node
-        var conditionalNode = headerValue
+        var conditionalNode = key._2
         while (conditionalNode != null) {
           val leafSupport = conditionalNode.getCount
 
@@ -387,7 +387,7 @@ class StreamingFPTree {
 
           if (conditionalFrequentItemsets.nonEmpty)
             for (is <- conditionalFrequentItemsets) {
-              is.getItems += headerKey
+              is.getItems += key._1
             }
 
           branchingItemsets ++= conditionalFrequentItemsets
@@ -410,6 +410,7 @@ class StreamingFPTree {
         val combinedItem = mutable.HashSet[Int]()
         combinedItem ++= i.getItems
         combinedItem ++= j.getItems
+        ret += new ItemsetWithCount(combinedItem, Math.min(i.getCount, j.getCount))
       }
     }
     ret.toList
