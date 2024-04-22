@@ -1,6 +1,6 @@
 package root_cause_analysis
 
-import models.{AnomalyEvent, DimensionSummary, ItemsetWithCount}
+import models.{AggregatedRecordsWBaseline, AnomalyEvent, DimensionSummary, ItemsetWithCount}
 import utils.count.AmortizedMaintenanceCounter
 import utils.itemset.FPTree.StreamingFPGrowth
 import utils.itemset.RiskRatio
@@ -92,7 +92,7 @@ class ExponentiallyDecayingEmergingItemsets(
     updateModelsAndDecay()
   }
 
-  def markOutlier(anomalyEvent: AnomalyEvent): Unit = {
+  def markOutlier(outlierEvent: AggregatedRecordsWBaseline): Unit = {
     numOutliers = numOutliers + 1
 //    outlierCountSummary.observe(anomalyEvent.aggregatedRecordsWBaseline)
 
@@ -101,7 +101,7 @@ class ExponentiallyDecayingEmergingItemsets(
     }
   }
 
-  def markInlier(inlierEvent: AnomalyEvent): Unit = {
+  def markInlier(inlierEvent: AggregatedRecordsWBaseline): Unit = {
     numInliers = numInliers + 1
 //    inlierCountSummary.observe(inlierEvent.aggregatedRecordsWBaseline)
 
@@ -111,7 +111,7 @@ class ExponentiallyDecayingEmergingItemsets(
       }
   }
 
-  private def getSingleItemItemsets(encoder:): ListBuffer[DimensionSummary] = {
+  private def getSingleItemItemsets(): ListBuffer[DimensionSummary] = {
     val supportCountRequired: Double = outlierCountSummary.getTotalCount * minSupportOutlier
     val ret: ListBuffer[DimensionSummary] = ListBuffer.empty[DimensionSummary]
     val inlierCounts = inlierCountSummary.getCounts
