@@ -3,7 +3,8 @@ package utils.sample
 import scala.collection.mutable
 import scala.util.Random
 
-class AChao[T](capacity: Int, random: Random = new Random) {
+class AChao[T](capacity: Int,
+               random: Random = new Random) {
   private var runningCount: Double = 0
   private val reservoir: mutable.ListBuffer[T] = mutable.ListBuffer()
   private val reservoirCapacity: Int = capacity
@@ -78,7 +79,8 @@ class AChao[T](capacity: Int, random: Random = new Random) {
         reservoir.toList
       }
   }
-  private case class OverweightRecord(record: T, weight: Double) extends Comparable[OverweightRecord] {
+  private case class OverweightRecord(record: T,
+                                      weight: Double) extends Comparable[OverweightRecord] {
     override def compareTo(o: OverweightRecord): Int = weight.compareTo(o.weight)
   }
 }

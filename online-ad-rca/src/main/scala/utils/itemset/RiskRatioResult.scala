@@ -5,7 +5,8 @@ package utils.itemset
  * @param riskRatio risk ratio number
  * @param correction the correction of risk ratio
  */
-class RiskRatioResult(private var riskRatio: Double, private var correction: Double) {
+class RiskRatioResult(private var riskRatio: Double,
+                      private var correction: Double) {
   def this(riskRatio: Double) {
     this(riskRatio, 0)
   }

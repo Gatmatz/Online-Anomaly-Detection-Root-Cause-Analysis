@@ -44,7 +44,8 @@ class StreamingFPGrowth(support: Double) {
     fp.insertTransactions(transactions, streaming = false, filterExistingFrequentItemsOnly = false)
   }
 
-  def decayAndResetFrequentItems(newFrequentItems: mutable.Map[Int, Double], decayRate: Double): Unit = {
+  def decayAndResetFrequentItems(newFrequentItems: mutable.Map[Int, Double],
+                                 decayRate: Double): Unit = {
     val toRemove: Set[Int] = fp.frequentItemOrder.keySet.diff(newFrequentItems.keySet).toSet
     fp.frequentItemCounts = newFrequentItems
     fp.updateFrequentItemOrder()

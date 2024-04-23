@@ -62,7 +62,8 @@ class StreamingFPTree {
    * @param start     the starting point of the traversal
    * @param treeDepth the current tree depth
    */
-  private def walkTree(start: FPTreeNode, treeDepth: Int): Unit = {
+  private def walkTree(start: FPTreeNode,
+                       treeDepth: Int): Unit = {
     val indentation = "\t" * treeDepth
     println("{} node: {}, count: {}, sorted: {}", indentation, start.getItem, start.getCount, sortedNodes.contains(start))
 
@@ -73,7 +74,8 @@ class StreamingFPTree {
     }
   }
 
-  def decayWeights(start: FPTreeNode, decayWeight: Double): Unit = {
+  def decayWeights(start: FPTreeNode,
+                   decayWeight: Double): Unit = {
      if (start == root) {
        for ((item, count) <- frequentItemCounts) {
          frequentItemCounts.put(item, count * decayWeight)
@@ -121,7 +123,8 @@ class StreamingFPTree {
     count
   }
 
-  def insertFrequentItems(transactions: List[Set[Int]], countRequiredForSupport: Int): Unit = {
+  def insertFrequentItems(transactions: List[Set[Int]],
+                          countRequiredForSupport: Int): Unit = {
     // Find the count of the items and store them in itemCounts HashMap
     val itemCounts = mutable.HashMap[Int, Double]()
     for (t <- transactions) {
@@ -195,7 +198,8 @@ class StreamingFPTree {
     }
   }
 
-  def insertConditionalFrequentItems(patterns:List[ItemsetWithCount], countRequiredForSupport: Int): Unit = {
+  def insertConditionalFrequentItems(patterns:List[ItemsetWithCount],
+                                     countRequiredForSupport: Int): Unit = {
     val itemCounts: mutable.HashMap[Int, Double] = mutable.HashMap.empty[Int, Double]
 
     for (i <- patterns) {
@@ -220,7 +224,9 @@ class StreamingFPTree {
     }
   }
 
-  def reinsertBranch(pattern: mutable.Set[Int], count: Double, rootOfBranch: FPTreeNode): Unit = {
+  def reinsertBranch(pattern: mutable.Set[Int],
+                     count: Double,
+                     rootOfBranch: FPTreeNode): Unit = {
     val filtered: List[Int] = pattern.filter(frequentItemCounts.contains).toList
     sortTransaction(filtered, isStreaming = false)
     rootOfBranch.insertTransaction(filtered, count, 0, streaming = false)
@@ -232,13 +238,17 @@ class StreamingFPTree {
     }
   }
 
-  def insertTransactions(transactions: List[Set[Int]], streaming: Boolean ,filterExistingFrequentItemsOnly: Boolean): Unit = {
+  def insertTransactions(transactions: List[Set[Int]],
+                         streaming: Boolean,
+                         filterExistingFrequentItemsOnly: Boolean): Unit = {
     for (transaction <- transactions) {
       insertTransaction(transaction, streaming, filterExistingFrequentItemsOnly)
     }
   }
 
-  def insertTransaction(transaction: Set[Int], streaming: Boolean, filterExistingFrequentItemsOnly: Boolean): Unit = {
+  def insertTransaction(transaction: Set[Int],
+                        streaming: Boolean,
+                        filterExistingFrequentItemsOnly: Boolean): Unit = {
     if (streaming && !filterExistingFrequentItemsOnly)
       {
         for (item <- transaction) {

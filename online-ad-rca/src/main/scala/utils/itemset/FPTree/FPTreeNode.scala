@@ -11,7 +11,10 @@ import scala.util.control.Breaks.{break, breakable}
  * @param count count of occurrences of the Node.
  * @param treeOfOrigin the StreamingFPTree the current Node belongs to
  */
-class FPTreeNode(item:Int, var parent: FPTreeNode, var count: Double, treeOfOrigin: StreamingFPTree) {
+class FPTreeNode(item: Int,
+                 var parent: FPTreeNode,
+                 var count: Double,
+                 treeOfOrigin: StreamingFPTree) {
   private var nextLink: FPTreeNode = _  // Points to the next node with the same item
   private var prevLink: FPTreeNode = _  // Points to the previous node with the same item
   private var children: ListBuffer[FPTreeNode] = _  // Represents the list of child nodes
@@ -168,7 +171,10 @@ class FPTreeNode(item:Int, var parent: FPTreeNode, var count: Double, treeOfOrig
    * @param currentIndex the index of the transaction
    */
 
-  def insertTransaction(fullTransaction: List[Int], itemCount: Double ,currentIndex: Int, streaming: Boolean): Unit = {
+  def insertTransaction(fullTransaction: List[Int],
+                        itemCount: Double,
+                        currentIndex: Int,
+                        streaming: Boolean): Unit = {
     if (!streaming)
       {
         treeOfOrigin.sortedNodes.add(this)
