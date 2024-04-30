@@ -1,5 +1,5 @@
 package root_cause_analysis
-import models.{AnomalyEvent, RCAResult}
+import models.{AnomalyEvent, DimensionSummary, RCAResult}
 import org.apache.flink.streaming.api.datastream.DataStream
 import utils.Periodic
 
@@ -17,10 +17,11 @@ class EWStreamingSummarizer(spec: EWStreamingSummarizerSpec, maximumSummaryDelay
   private var count: Int = 0
   private var needsSummarization: Boolean = false
 
-  def runSearch(anomalyStream: DataStream[(AnomalyEvent, Boolean)]): DataStream[RCAResult] = {
-    consume(anomalyStream)
-    var isr: DataStream[RCAResult] =
-  }
+//  def runSearch(anomalyStream: DataStream[(AnomalyEvent, Boolean)]): DataStream[RCAResult] = {
+//    consume(anomalyStream)
+//    var summaries: List[DimensionSummary] = streamingSummarizer.getItemsets()
+////    var isr: DataStream[RCAResult]= new RCAResult()
+//  }
 
   private def consume(anomalyStream: DataStream[(AnomalyEvent, Boolean)]): Unit = {
     var passedStream: DataStream[Unit] = anomalyStream.map { eventWithFlag =>

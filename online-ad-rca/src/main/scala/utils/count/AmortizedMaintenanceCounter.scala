@@ -98,10 +98,14 @@ class AmortizedMaintenanceCounter(maxStableSize: Int)
     }
   }
 
-  def observe(item:Int): Unit = {
+  def observe(item: Int): Unit = {
     observe(item, 1)
   }
-
+  def observe(items: List[Int]): Unit = {
+    for (item <- items) {
+      observe(item)
+    }
+  }
   def getTotalCount: Double = {
     totalCount / decayFactor
   }

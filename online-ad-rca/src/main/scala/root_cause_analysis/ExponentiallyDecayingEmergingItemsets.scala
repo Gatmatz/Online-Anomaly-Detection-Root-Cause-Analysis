@@ -1,7 +1,8 @@
 package root_cause_analysis
 
-import models.{AggregatedRecordsWBaseline, AnomalyEvent, DimensionSummary, ItemsetWithCount}
+import models.{AggregatedRecordsWBaseline, DimensionSummary, ItemsetWithCount}
 import utils.count.AmortizedMaintenanceCounter
+import utils.encoder.IntegerEncoder
 import utils.itemset.FPTree.StreamingFPGrowth
 import utils.itemset.RiskRatio
 
@@ -25,6 +26,8 @@ class ExponentiallyDecayingEmergingItemsets(
 
   private val outlierPatternSummary: StreamingFPGrowth = new StreamingFPGrowth(minSupportOutlier)
   private val inlierPatternSummary: StreamingFPGrowth = new StreamingFPGrowth(0)
+
+  private val encoder = new IntegerEncoder()
 
   var interestingItems: mutable.HashMap[Int, Double] = _
 
@@ -69,7 +72,6 @@ class ExponentiallyDecayingEmergingItemsets(
             if (inlierCount != -1.0 && RiskRatio.compute(inlierCount, value, inlierCountSummary.getTotalCount, outlierCountSummary.getTotalCount).get() < minRatio)
               {
 
-
               }
             else
               {
@@ -92,26 +94,36 @@ class ExponentiallyDecayingEmergingItemsets(
     updateModelsAndDecay()
   }
 
+  def getIntegerAttributes(event: AggregatedRecordsWBaseline): List[Int] = {
+    (event.current_dimensions_breakdown.keySet ++ event.baseline_dimensions_breakdown.keySet).map(dim => {
+      val dimension = encoder.getDimensionInt(dim.name).getOrElse(-1)
+      val encoding = encoder.getIntegerEncoding(dimension, dim.value)
+      encoding
+    }).toList
+  }
+
   def markOutlier(outlierEvent: AggregatedRecordsWBaseline): Unit = {
     numOutliers = numOutliers + 1
-//    outlierCountSummary.observe(anomalyEvent.aggregatedRecordsWBaseline)
+    val attributes: List[Int] = getIntegerAttributes(outlierEvent)
+    outlierCountSummary.observe(attributes)
 
     if (!combinationsEnabled || attributeDimension > 1) {
-//      outlierPatternSummary.insertTransactionsStreamingExact(anomalyEvent.aggregatedRecordsWBaseline)
+      outlierPatternSummary.insertTransactionFalseNegative(attributes.toSet)
     }
   }
 
   def markInlier(inlierEvent: AggregatedRecordsWBaseline): Unit = {
     numInliers = numInliers + 1
-//    inlierCountSummary.observe(inlierEvent.aggregatedRecordsWBaseline)
+    val attributes: List[Int] = getIntegerAttributes(inlierEvent)
+    inlierCountSummary.observe(attributes)
 
     if (!combinationsEnabled || attributeDimension > 1)
       {
-//        inlierPatternSummary.insertTransactionsStreamingExact(inlierEvent.aggregatedRecordsWBaseline)
+        inlierPatternSummary.insertTransactionFalseNegative(attributes.toSet)
       }
   }
 
-  private def getSingleItemItemsets(): ListBuffer[DimensionSummary] = {
+  private def getSingleItemItemsets: ListBuffer[DimensionSummary] = {
     val supportCountRequired: Double = outlierCountSummary.getTotalCount * minSupportOutlier
     val ret: ListBuffer[DimensionSummary] = ListBuffer.empty[DimensionSummary]
     val inlierCounts = inlierCountSummary.getCounts
@@ -125,7 +137,8 @@ class ExponentiallyDecayingEmergingItemsets(
           }
         else
           {
-            val ratio: Double = RiskRatio.compute(inlierCounts.getOrElse(key, -1.0), value, inlierCountSummary.getTotalCount,outlierCountSummary.getTotalCount).getCorrectedRiskRatio()
+            val exposedInlierCount: Double = inlierCounts.getOrElse(key, -1.0)
+            val ratio: Double = RiskRatio.compute(exposedInlierCount, value, inlierCountSummary.getTotalCount,outlierCountSummary.getTotalCount).getCorrectedRiskRatio()
             if (ratio > minRatio)
               {
                 ret += DimensionSummary(null, 0, 0, 0, 0, 0, 0)
@@ -136,8 +149,8 @@ class ExponentiallyDecayingEmergingItemsets(
     ret
   }
 
-  def getItemsets(encoder:) :List[DimensionSummary] = {
-    val singleItemsets = getSingleItemItemsets(encoder)
+  def getItemsets :List[DimensionSummary] = {
+    val singleItemsets = getSingleItemItemsets
 
     if (!combinationsEnabled || attributeDimension == 1)
       {
@@ -195,7 +208,7 @@ class ExponentiallyDecayingEmergingItemsets(
 
       if (ratio >= minRatio)
         {
-          ret += DimensionSummary(oc.getCount / outlierCountSummary, oc.getCount, ratio, 0, 0, 0, 0)
+//          ret += DimensionSummary(oc.getCount / outlierCountSummary, oc.getCount, ratio, 0, 0, 0, 0)
         }
     }
 
