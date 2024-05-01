@@ -10,16 +10,6 @@ import scala.collection.mutable.ListBuffer
 class IntegerEncoderTest {
 
   @Test
-  def testDimensions(): Unit = {
-    val encoder = new IntegerEncoder()
-
-    assertEquals(0, encoder.getDimensionInt("ca_city").getOrElse(-1))
-    assertEquals(1, encoder.getDimensionInt("ca_county").getOrElse(-1))
-    assertEquals(2, encoder.getDimensionInt("ca_state").getOrElse(-1))
-    assertEquals(3, encoder.getDimensionInt("sm_code").getOrElse(-1))
-  }
-
-  @Test
   def testInsertion(): Unit = {
     val encoder = new IntegerEncoder()
 
@@ -35,8 +25,7 @@ class IntegerEncoderTest {
 
     val encodings = ListBuffer[Int]()
     for ((key, value) <- input_record.dimensions) {
-      val dimension_int: Int = encoder.getDimensionInt(key).getOrElse(-1)
-      val encoding = encoder.getIntegerEncoding(dimension_int, value.value)
+      val encoding = encoder.getIntegerEncoding(value)
       encodings += encoding
     }
 
@@ -56,13 +45,20 @@ class IntegerEncoderTest {
 
     val new_encodings = ListBuffer[Int]()
     for ((key, value) <- input_record_2.dimensions) {
-      val dimension_int: Int = encoder.getDimensionInt(key).getOrElse(-1)
-      val encoding = encoder.getIntegerEncoding(dimension_int, value.value)
+      val encoding = encoder.getIntegerEncoding(value)
       new_encodings += encoding
     }
 
     assertEquals(0, new_encodings.head)
     assertEquals(3, new_encodings(1))
     assertEquals(2, new_encodings(2))
+
+
+    // Retrieve dimensions
+    val retrievedDimension = encoder.getAttribute(0)
+    assertEquals("sm_code", retrievedDimension.name)
+    assertEquals("OVERNIGHT", retrievedDimension.value)
+    assertEquals("delivery", retrievedDimension.group)
+    assertEquals(1, retrievedDimension.level)
   }
 }

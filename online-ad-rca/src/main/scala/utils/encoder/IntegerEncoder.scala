@@ -1,50 +1,52 @@
 package utils.encoder
 
 import config.AppConfig
+import models.Dimension
 import utils.Types
 
 import scala.collection.mutable
 
 /**
- * Integer Encoding Class that encodes Dimensions to unique integers
+ * Integer Encoding Class that encodes Dimensions to unique integers.
  */
 class IntegerEncoder {
-  private val attributeDimensionNameMap: mutable.Map[Int, String] = {
-    val DIMENSION_NAMES = AppConfig.InputStream.DIMENSION_NAMES
-    val map = mutable.HashMap[Int, String]()
-    for (i <- DIMENSION_NAMES.indices) {
-      map.put(i, DIMENSION_NAMES(i))
-    }
-    map
-  }
-  private val integerEncoding: mutable.Map[Int, mutable.Map[Types.DimensionValue, Int]] = mutable.HashMap()
+  private val integerEncoding: mutable.Map[Types.DimensionName, mutable.Map[Types.DimensionValue, Int]] = mutable.HashMap()
   private var nextKey: Int = 0 // The next available integer key for assignment
-
-  /**
-   * Function that reverse searches for the integer key of the given dimension.
-   * @param dimension the name of the dimension
-   * @return the integer key of the given dimension
-   */
-  def getDimensionInt(dimension: String): Option[Int] = {
-    attributeDimensionNameMap.find { case (_, v) => v == dimension }.map { case (k, _) => k }
-  }
-
+  private val integerToDimension: mutable.Map[Int, Types.DimensionName] = mutable.HashMap()
   /**
    * Creates or retrieves an integer encoding for a given attribute.
    * @param dimension the dimension key of the attribute
    * @param attr the attribute of the dimension
    * @return an integer representation of the attribute
    */
-  def getIntegerEncoding(dimension: Int, attr: Types.DimensionValue): Int = {
+  def getIntegerEncoding(dimension: Dimension): Int = {
     // Check if the attribute is already given to encoder
-    val dimensionMap = integerEncoding.getOrElseUpdate(dimension, mutable.HashMap())
+    val dimensionMap = integerEncoding.getOrElseUpdate(dimension.name, mutable.HashMap())
     // Retrieve the encoding or create a new one
-    val ret = dimensionMap.getOrElse(attr, {
+    val ret = dimensionMap.getOrElse(dimension.value, {
       val newKey = nextKey
       nextKey += 1
-      dimensionMap(attr) = newKey
+      integerToDimension(newKey) = dimension.name
+      dimensionMap(dimension.value) = newKey
       newKey
     })
     ret
+  }
+
+  def getAttribute(encodedAttr: Int): Dimension = {
+    val dimensionName: Types.DimensionName = integerToDimension.get(encodedAttr).orNull
+    val dimensionMap = integerEncoding.getOrElse(dimensionName, null)
+
+    var attribute: Types.DimensionValue = null
+    for ((key, value) <- dimensionMap) {
+      if (value == encodedAttr) {
+        attribute = key
+      }
+    }
+
+    val group: Types.DimensionGroup = AppConfig.InputStream.DIMENSION_DEFINITIONS.getConfig(dimensionName).getString("group")
+    val level: Types.DimensionLevel = AppConfig.InputStream.DIMENSION_LEVELS(dimensionName)
+
+    Dimension(dimensionName, attribute, group, level)
   }
 }

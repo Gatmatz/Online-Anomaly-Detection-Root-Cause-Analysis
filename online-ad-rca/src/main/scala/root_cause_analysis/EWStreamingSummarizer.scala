@@ -20,7 +20,7 @@ class EWStreamingSummarizer(spec: EWStreamingSummarizerSpec, maximumSummaryDelay
 //  def runSearch(anomalyStream: DataStream[(AnomalyEvent, Boolean)]): DataStream[RCAResult] = {
 //    consume(anomalyStream)
 //    var summaries: List[DimensionSummary] = streamingSummarizer.getItemsets()
-////    var isr: DataStream[RCAResult]= new RCAResult()
+//    var isr: DataStream[RCAResult]= new RCAResult()
 //  }
 
   private def consume(anomalyStream: DataStream[(AnomalyEvent, Boolean)]): Unit = {

@@ -1,6 +1,6 @@
 package root_cause_analysis
 
-import models.{AggregatedRecordsWBaseline, DimensionSummary, ItemsetWithCount}
+import models.{AggregatedRecordsWBaseline, DimensionSummary, ItemsetWithCount, RCAResult}
 import utils.count.AmortizedMaintenanceCounter
 import utils.encoder.IntegerEncoder
 import utils.itemset.FPTree.StreamingFPGrowth
@@ -94,10 +94,9 @@ class ExponentiallyDecayingEmergingItemsets(
     updateModelsAndDecay()
   }
 
-  def getIntegerAttributes(event: AggregatedRecordsWBaseline): List[Int] = {
+  private def getIntegerAttributes(event: AggregatedRecordsWBaseline): List[Int] = {
     (event.current_dimensions_breakdown.keySet ++ event.baseline_dimensions_breakdown.keySet).map(dim => {
-      val dimension = encoder.getDimensionInt(dim.name).getOrElse(-1)
-      val encoding = encoder.getIntegerEncoding(dimension, dim.value)
+      val encoding = encoder.getIntegerEncoding(dim)
       encoding
     }).toList
   }
@@ -141,7 +140,10 @@ class ExponentiallyDecayingEmergingItemsets(
             val ratio: Double = RiskRatio.compute(exposedInlierCount, value, inlierCountSummary.getTotalCount,outlierCountSummary.getTotalCount).getCorrectedRiskRatio()
             if (ratio > minRatio)
               {
-                ret += DimensionSummary(null, 0, 0, 0, 0, 0, 0)
+                val outlierCountValue: Double = value
+                val support = outlierCountValue / outlierCountSummary.getTotalCount
+                val dimension = encoder.getAttribute(key)
+                ret += DimensionSummary(dimension, support, support, ratio, outlierCountValue, outlierCountValue, outlierCountValue)
               }
           }
       }
@@ -149,12 +151,14 @@ class ExponentiallyDecayingEmergingItemsets(
     ret
   }
 
-  def getItemsets :List[DimensionSummary] = {
+  def getItemsets :List[RCAResult] = {
     val singleItemsets = getSingleItemItemsets
 
     if (!combinationsEnabled || attributeDimension == 1)
       {
-        return singleItemsets.toList
+        val list = ListBuffer[RCAResult]()
+        list += RCAResult(null, null, 0, 0, null, singleItemsets.toList)
+        return list.toList
       }
 
     val iwc = outlierPatternSummary.getItemsets
