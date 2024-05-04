@@ -9,27 +9,27 @@ import utils.itemset.RiskRatio
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 class ExponentiallyDecayingEmergingItemsets(
-                                           inlierSummarySize: Int,
-                                           outlierSummarySize: Int,
-                                           minSupportOutlier: Double,
-                                           minRatio: Double,
-                                           exponentialDecayRate: Double,
+                                           inlierSummarySize: Int, // Size of the heavy-hitters sketch on the inliers
+                                           outlierSummarySize: Int, // Size of the heavy-hitters sketch on the outliers
+                                           minSupportOutlier: Double, // Minimum support for the outliers
+                                           minRatio: Double, // Minimum Risk Ratio
+                                           exponentialDecayRate: Double, // Ratio to prune the sketch size
                                            attributeDimension: Int,
                                            combinationsEnabled: Boolean
                                            ) {
 
-  private var numInliers: Double = 0
-  private var numOutliers: Double = 0
+  private var numInliers: Double = 0 // Number of inliers observed
+  private var numOutliers: Double = 0 // Number of outlier observed
 
-  private val outlierCountSummary: AmortizedMaintenanceCounter = new AmortizedMaintenanceCounter(outlierSummarySize)
-  private val inlierCountSummary: AmortizedMaintenanceCounter = new AmortizedMaintenanceCounter(inlierSummarySize)
+  private val outlierCountSummary: AmortizedMaintenanceCounter = new AmortizedMaintenanceCounter(outlierSummarySize) // AMC sketch for outlier attributes
+  private val inlierCountSummary: AmortizedMaintenanceCounter = new AmortizedMaintenanceCounter(inlierSummarySize) // AMC sketch for inlier attributes
 
-  private val outlierPatternSummary: StreamingFPGrowth = new StreamingFPGrowth(minSupportOutlier)
-  private val inlierPatternSummary: StreamingFPGrowth = new StreamingFPGrowth(0)
+  private val outlierPatternSummary: StreamingFPGrowth = new StreamingFPGrowth(minSupportOutlier) // FPGrowth for producing explanations on the outliers
+  private val inlierPatternSummary: StreamingFPGrowth = new StreamingFPGrowth(0) // FPGrowth for producing explanations on the inliers
 
-  private val encoder = new IntegerEncoder()
+  private val encoder = new IntegerEncoder() // Integer Encoder for translating the attributes to unique integers.
 
-  var interestingItems: mutable.HashMap[Int, Double] = _
+  private var interestingItems: mutable.HashMap[Int, Double] = _
 
   def getInlierCount: Double = {
     numInliers
@@ -42,11 +42,11 @@ class ExponentiallyDecayingEmergingItemsets(
     updateModels(false)
   }
 
-  def updateModelsAndDecay(): Unit = {
+  private def updateModelsAndDecay(): Unit = {
     updateModels(true)
   }
 
-  def updateModels(doDecay: Boolean): Unit = {
+  private def updateModels(doDecay: Boolean): Unit = {
     if (!combinationsEnabled || attributeDimension == 1)
       {
         return
@@ -122,9 +122,9 @@ class ExponentiallyDecayingEmergingItemsets(
       }
   }
 
-  private def getSingleItemItemsets: ListBuffer[DimensionSummary] = {
+  private def getSingleItemItemsets: ListBuffer[RCAResult] = {
     val supportCountRequired: Double = outlierCountSummary.getTotalCount * minSupportOutlier
-    val ret: ListBuffer[DimensionSummary] = ListBuffer.empty[DimensionSummary]
+    val ret: ListBuffer[RCAResult] = ListBuffer.empty[RCAResult]
     val inlierCounts = inlierCountSummary.getCounts
     val outlierCounts = outlierCountSummary.getCounts
 
@@ -143,7 +143,8 @@ class ExponentiallyDecayingEmergingItemsets(
                 val outlierCountValue: Double = value
                 val support = outlierCountValue / outlierCountSummary.getTotalCount
                 val dimension = encoder.getAttribute(key)
-                ret += DimensionSummary(dimension, support, support, ratio, outlierCountValue, outlierCountValue, outlierCountValue)
+                val dimensionSummary = DimensionSummary(dimension, support, support, ratio, outlierCountValue, outlierCountValue, outlierCountValue)
+                ret += RCAResult(null, null, outlierCountValue, ratio, "1", List(dimensionSummary))
               }
           }
       }
@@ -151,14 +152,12 @@ class ExponentiallyDecayingEmergingItemsets(
     ret
   }
 
-  def getItemsets :List[RCAResult] = {
+  def getItemsets : List[RCAResult] = {
     val singleItemsets = getSingleItemItemsets
 
     if (!combinationsEnabled || attributeDimension == 1)
       {
-        val list = ListBuffer[RCAResult]()
-        list += RCAResult(null, null, 0, 0, null, singleItemsets.toList)
-        return list.toList
+        return singleItemsets.toList
       }
 
     val iwc = outlierPatternSummary.getItemsets
@@ -171,7 +170,7 @@ class ExponentiallyDecayingEmergingItemsets(
 
     val ratioItemsToCheck: mutable.HashSet[Int] = mutable.HashSet.empty[Int]
     val ratioSetsToCheck: mutable.ListBuffer[ItemsetWithCount] = mutable.ListBuffer.empty[ItemsetWithCount]
-    val ret = singleItemsets
+    val ret: ListBuffer[RCAResult] = singleItemsets
 
     var prevSet: mutable.Set[Int] = null
     var prevCount: Double = -1.0
@@ -201,7 +200,7 @@ class ExponentiallyDecayingEmergingItemsets(
 
 
     assert(matchingInlierCounts.size == ratioSetsToCheck.size)
-    for (i <- 0 until matchingInlierCounts.size) {
+    for (i <- matchingInlierCounts.indices) {
       val ic: ItemsetWithCount = matchingInlierCounts(i)
       val oc = ratioSetsToCheck(i)
 
@@ -212,19 +211,30 @@ class ExponentiallyDecayingEmergingItemsets(
 
       if (ratio >= minRatio)
         {
-//          ret += DimensionSummary(oc.getCount / outlierCountSummary, oc.getCount, ratio, 0, 0, 0, 0)
+          val support = oc.getCount / outlierCountSummary.getTotalCount
+          val outlierCountValue = oc.getCount
+          val attributeSummaries = ListBuffer[DimensionSummary]()
+
+          for (item <- oc.getItems) {
+            val dimension = encoder.getAttribute(item)
+            val dimensionSummary = DimensionSummary(dimension, support, support, ratio, outlierCountValue, outlierCountValue, outlierCountValue)
+            attributeSummaries += dimensionSummary
+          }
+
+          val summary = RCAResult(null, null, outlierCountValue, ratio, "1", attributeSummaries.toList)
+          ret += summary
         }
     }
 
     // finally sort one last time
-//    val sortedRet = ret.sortWith { (x, y) =>
-//      if (x.getNumRecords != y.getNumRecords)
-//        x.getNumRecords > y.getNumRecords
-//      else
-//        x.getItems.size > y.getItems.size
-//    }
-//    sortedRet.toList
-    ret.toList
+    val sortedRet: ListBuffer[RCAResult] = ret.sortWith { (x: RCAResult, y:RCAResult) =>
+      if (x.currentTotal != y.currentTotal)
+        x.currentTotal > y.currentTotal
+      else
+        x.dimensionSummaries.size > y.dimensionSummaries.size
+    }
+
+    sortedRet.toList
   }
 
 }

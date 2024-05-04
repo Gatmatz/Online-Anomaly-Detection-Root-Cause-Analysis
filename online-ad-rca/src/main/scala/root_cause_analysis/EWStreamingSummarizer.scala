@@ -1,6 +1,6 @@
 package root_cause_analysis
-import models.{AnomalyEvent, DimensionSummary, RCAResult}
-import org.apache.flink.streaming.api.datastream.DataStream
+import models.{AnomalyEvent, RCAResult}
+import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment, createTypeInformation}
 import utils.Periodic
 
 class EWStreamingSummarizer(spec: EWStreamingSummarizerSpec, maximumSummaryDelay: Int) {
@@ -12,16 +12,19 @@ class EWStreamingSummarizer(spec: EWStreamingSummarizerSpec, maximumSummaryDelay
     spec.decayRate,
     spec.attributes.size,
     spec.attributeCombinations)
-  private var summaryUpdater: Periodic = new Periodic(spec.decayType, spec.summaryUpdatePeriod, () => streamingSummarizer.markPeriod())
-  private var summarizationTimer: Periodic = new Periodic(spec.decayType, maximumSummaryDelay, () => needsSummarization = true)
+
+  private val summaryUpdater: Periodic = new Periodic(spec.decayType, spec.summaryUpdatePeriod, () => streamingSummarizer.markPeriod())
+  private val summarizationTimer: Periodic = new Periodic(spec.decayType, maximumSummaryDelay, () => needsSummarization = true)
   private var count: Int = 0
   private var needsSummarization: Boolean = false
 
-//  def runSearch(anomalyStream: DataStream[(AnomalyEvent, Boolean)]): DataStream[RCAResult] = {
-//    consume(anomalyStream)
-//    var summaries: List[DimensionSummary] = streamingSummarizer.getItemsets()
-//    var isr: DataStream[RCAResult]= new RCAResult()
-//  }
+  def runSearch(anomalyStream: DataStream[(AnomalyEvent, Boolean)]): DataStream[RCAResult] = {
+    val env: StreamExecutionEnvironment = anomalyStream.executionEnvironment
+    consume(anomalyStream)
+    val summaries: List[RCAResult] = streamingSummarizer.getItemsets
+    val outputStream: DataStream[RCAResult] = env.fromCollection(summaries)
+    outputStream
+  }
 
   private def consume(anomalyStream: DataStream[(AnomalyEvent, Boolean)]): Unit = {
     var passedStream: DataStream[Unit] = anomalyStream.map { eventWithFlag =>

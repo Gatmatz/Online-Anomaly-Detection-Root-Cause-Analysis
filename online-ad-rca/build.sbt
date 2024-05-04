@@ -19,8 +19,9 @@ lazy val root = (project in file("."))
     libraryDependencies ++= flinkDependencies,
     libraryDependencies += "com.typesafe" % "config" % "1.4.2",
     libraryDependencies += "org.scalatest" %% "scalatest-flatspec" % "3.3.0-SNAP3" % Test,
-    libraryDependencies += "org.scalatest" %% "scalatest" % "3.3.0-SNAP3" % Test
-  )
+    libraryDependencies += "org.scalatest" %% "scalatest" % "3.3.0-SNAP3" % Test,
+    libraryDependencies += "org.apache.commons" % "commons-csv" % "1.10.0"
+)
 
 // entry point
 assembly / mainClass := Some("jobs.MainJob")
