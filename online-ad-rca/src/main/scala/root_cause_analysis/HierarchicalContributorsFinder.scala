@@ -164,7 +164,8 @@ class HierarchicalContributorsFinder extends ContributorsFinder {
             groupBaselineDimensionsBreakdown,
             groupDimensionsHierarchies,
             record.aggregatedRecordsWBaseline.records_in_baseline_offset
-          )
+          ),
+          record.isOutlier
         )
       )
     }).toSeq

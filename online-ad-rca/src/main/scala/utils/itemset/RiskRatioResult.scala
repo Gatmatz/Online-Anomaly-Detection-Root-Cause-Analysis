@@ -6,7 +6,7 @@ package utils.itemset
  * @param correction the correction of risk ratio
  */
 class RiskRatioResult(private var riskRatio: Double,
-                      private var correction: Double) {
+                      private var correction: Double) extends Serializable {
   def this(riskRatio: Double) {
     this(riskRatio, 0)
   }

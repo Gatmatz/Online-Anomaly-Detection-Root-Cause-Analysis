@@ -4,7 +4,7 @@ import scala.collection.mutable
 import scala.util.Random
 
 class AChao[T](capacity: Int,
-               random: Random = new Random) {
+               random: Random = new Random) extends Serializable {
   private var runningCount: Double = 0
   private val reservoir: mutable.ListBuffer[T] = mutable.ListBuffer()
   private val reservoirCapacity: Int = capacity

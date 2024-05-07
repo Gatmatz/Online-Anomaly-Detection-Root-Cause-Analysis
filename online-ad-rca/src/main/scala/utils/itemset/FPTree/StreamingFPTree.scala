@@ -7,7 +7,7 @@ import scala.collection.mutable.ListBuffer
 import scala.language.postfixOps
 import scala.util.control.Breaks.{break, breakable}
 
-class StreamingFPTree {
+class StreamingFPTree extends Serializable {
   // Create the root
   val root: FPTreeNode = new FPTreeNode(-1, null, 0, this)
 

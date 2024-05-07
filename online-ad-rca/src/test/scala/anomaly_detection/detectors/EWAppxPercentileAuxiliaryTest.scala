@@ -3,7 +3,7 @@ package anomaly_detection.detectors
 import aggregators.metric_aggregators.SumAggregator
 import aggregators.{EWFeatureTransform, OffsetBaselineAggregator}
 import config.AppConfig
-import models.{AggregatedRecords, AggregatedRecordsWBaseline, InputRecord}
+import models.{AggregatedRecords, AggregatedRecordsWBaseline, AnomalyEvent, InputRecord}
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment, createTypeInformation}
 import org.apache.flink.streaming.api.windowing.assigners.SlidingEventTimeWindows
 import org.apache.flink.streaming.api.windowing.time.Time
@@ -49,7 +49,7 @@ class EWAppxPercentileAuxiliaryTest extends AnyFlatSpec
     // Anomaly Detection
     val detector = new EWAppxPercentileAuxiliary(spec)
 
-    val anomalyEventStream: DataStream[(AggregatedRecordsWBaseline, Boolean)] = aggregatedRecordsWScore
+    val anomalyEventStream: DataStream[AnomalyEvent] = aggregatedRecordsWScore
       .flatMap(detector)
 
     anomalyEventStream.print()

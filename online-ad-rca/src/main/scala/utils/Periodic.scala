@@ -8,7 +8,7 @@ package utils
  */
 class Periodic(periodType: Types.PeriodType,
                periodLength: Double,
-               task: Runnable) {
+               @transient task: Runnable) extends Serializable {
 
   private var previousPeriod: Double = _
   private var numCalls: Int = _

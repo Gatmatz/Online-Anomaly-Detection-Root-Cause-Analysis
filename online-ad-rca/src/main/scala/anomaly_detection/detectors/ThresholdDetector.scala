@@ -38,7 +38,7 @@ class ThresholdDetector extends AnomalyDetector[ThresholdDetectorSpec] {
     // anomaly detection
     val anomalyEventStream: DataStream[AnomalyEvent] = aggregatedRecordsWBaselineStream
       .filter(record => isAnomaly(record.current))
-      .map(record => AnomalyEvent(record))
+      .map(record => AnomalyEvent(record, isOutlier = true))
 
     anomalyEventStream
   }

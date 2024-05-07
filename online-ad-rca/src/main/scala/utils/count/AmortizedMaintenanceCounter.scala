@@ -27,7 +27,7 @@ import scala.collection.mutable
  *
  * @param maxStableSize Counter's max size
  */
-class AmortizedMaintenanceCounter(maxStableSize: Int)
+class AmortizedMaintenanceCounter(maxStableSize: Int) extends Serializable
 {
   private var decayFactor: Double = 1
   private val DECAY_RESET_THRESHOLD: Double = Double.MaxValue * .5

@@ -9,7 +9,7 @@ import scala.collection.mutable
 /**
  * Integer Encoding Class that encodes Dimensions to unique integers.
  */
-class IntegerEncoder {
+class IntegerEncoder extends Serializable {
   private val integerEncoding: mutable.Map[Types.DimensionName, mutable.Map[Types.DimensionValue, Int]] = mutable.HashMap()
   private var nextKey: Int = 0 // The next available integer key for assignment
   private val integerToDimension: mutable.Map[Int, Types.DimensionName] = mutable.HashMap()

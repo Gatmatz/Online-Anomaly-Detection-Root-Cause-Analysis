@@ -5,7 +5,7 @@ import models.ItemsetWithCount
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
-class StreamingFPGrowth(support: Double) {
+class StreamingFPGrowth(support: Double) extends Serializable {
 
   val fp: StreamingFPTree = new StreamingFPTree()
   var needsRestructure: Boolean = false

@@ -14,7 +14,7 @@ import scala.util.control.Breaks.{break, breakable}
 class FPTreeNode(item: Int,
                  var parent: FPTreeNode,
                  var count: Double,
-                 treeOfOrigin: StreamingFPTree) {
+                 treeOfOrigin: StreamingFPTree) extends Serializable {
   private var nextLink: FPTreeNode = _  // Points to the next node with the same item
   private var prevLink: FPTreeNode = _  // Points to the previous node with the same item
   private var children: ListBuffer[FPTreeNode] = _  // Represents the list of child nodes

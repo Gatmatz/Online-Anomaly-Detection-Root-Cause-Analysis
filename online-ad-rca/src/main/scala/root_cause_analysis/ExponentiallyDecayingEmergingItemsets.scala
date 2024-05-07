@@ -16,7 +16,7 @@ class ExponentiallyDecayingEmergingItemsets(
                                            exponentialDecayRate: Double, // Ratio to prune the sketch size
                                            attributeDimension: Int,
                                            combinationsEnabled: Boolean
-                                           ) {
+                                           ) extends Serializable {
 
   private var numInliers: Double = 0 // Number of inliers observed
   private var numOutliers: Double = 0 // Number of outlier observed

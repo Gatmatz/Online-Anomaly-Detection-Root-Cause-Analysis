@@ -47,13 +47,6 @@ class EWAppxPercentileOutlierClassifier extends AnomalyDetector[EWAppxPercentile
     // The Anomalies are filtered and then they are translated to AnomalyEvent instances.
     val anomalyEventStream: DataStream[AnomalyEvent] = aggregatedStreamWScore
       .flatMap(detector)  // Detect each AggregatedRecordWBaseline to Anomaly or Not
-      .filter(_._2)   // Filter out the Normal Points
-      .map {
-        // Specify types explicitly
-        (tuple: (AggregatedRecordsWBaseline, Boolean)) =>
-          val (record, _) = tuple
-          AnomalyEvent(record)
-      }
 
     anomalyEventStream
   }

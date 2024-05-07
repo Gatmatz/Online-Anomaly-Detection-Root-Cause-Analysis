@@ -11,7 +11,7 @@ case class EWStreamingSummarizerSpec(
                                         minSupport: Double,
                                         attributes: List[String],
                                         attributeCombinations: Boolean
-                                      ) {
+                                      ) extends Serializable {
   def this(
             summaryUpdatePeriod: Double,
             decayType: Types.PeriodType,

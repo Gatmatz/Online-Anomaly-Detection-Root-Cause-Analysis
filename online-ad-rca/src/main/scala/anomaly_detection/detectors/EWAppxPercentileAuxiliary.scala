@@ -19,7 +19,7 @@ import scala.util.Random
  * @param spec the specification of the AD detection
  */
 class EWAppxPercentileAuxiliary(spec: EWAppxPercentileOutlierClassifierSpec)
-  extends RichFlatMapFunction[(AggregatedRecordsWBaseline, Double), (AggregatedRecordsWBaseline, Boolean)] {
+  extends RichFlatMapFunction[(AggregatedRecordsWBaseline, Double), AnomalyEvent] {
 
   private var reservoir: AdaptableDampedReservoir[(AggregatedRecordsWBaseline, Double)] = _
   private var currentThreshold: Double = 0.0
@@ -41,7 +41,7 @@ class EWAppxPercentileAuxiliary(spec: EWAppxPercentileOutlierClassifierSpec)
     currentThreshold = sortedNorms(index)._2
   }
 
-  override def flatMap(value: (AggregatedRecordsWBaseline, Double), out: Collector[(AggregatedRecordsWBaseline, Boolean)]): Unit = {
+  override def flatMap(value: (AggregatedRecordsWBaseline, Double), out: Collector[AnomalyEvent]): Unit = {
     tupleCount += 1
 
     if (tupleCount < spec.warmupCount)
@@ -59,7 +59,7 @@ class EWAppxPercentileAuxiliary(spec: EWAppxPercentileOutlierClassifierSpec)
         for (record <- warmupInput)
         {
           val isAnomaly: Boolean = record._2 > currentThreshold
-          out.collect((record._1,isAnomaly))
+          out.collect(AnomalyEvent(record._1, isAnomaly))
         }
         warmupInput.clear()
       }
@@ -67,7 +67,7 @@ class EWAppxPercentileAuxiliary(spec: EWAppxPercentileOutlierClassifierSpec)
       reservoir.insert(value)
       val isAnomaly: Boolean = value._2 > currentThreshold
 
-      out.collect((value._1,isAnomaly))
+      out.collect(AnomalyEvent(value._1, isAnomaly))
     }
   }
 }
