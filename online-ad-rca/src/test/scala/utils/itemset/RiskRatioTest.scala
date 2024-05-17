@@ -21,13 +21,13 @@ class RiskRatioTest {
 
     // Test with event only found in exposed
     assertEquals(Double.PositiveInfinity, RiskRatio.compute(0, 100, 100, 100).get(), 0)
-    assertEquals(Double.PositiveInfinity, RiskRatio.compute(null, 100, 100, 100).get(), 0)
+    assertEquals(Double.PositiveInfinity, RiskRatio.compute(-1.0, 100, 100, 100).get(), 0)
 
     // Test with event never found in exposed
     assertEquals(0, RiskRatio.compute(100, 0, 1000, 100).get(), 0)
-    assertEquals(0, RiskRatio.compute(100, null, 1000, 100).get(), 0)
+    assertEquals(0, RiskRatio.compute(100, -1.0, 1000, 100).get(), 0)
 
     // Test the handling of nulls and all zeros
-    assertEquals(0, RiskRatio.compute(null, null, null, null).get(), 0)
+    assertEquals(0, RiskRatio.compute(-1.0, -1.0, -1.0, -1.0).get(), 0)
   }
 }

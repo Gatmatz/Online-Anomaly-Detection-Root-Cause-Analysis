@@ -43,15 +43,43 @@ object RiskRatio {
       (unexposedOutlierCount / totalMinusExposedCount), correction)
   }
 
-  def compute(exposedInlierCount: Number,
-              exposedOutlierCount: Number,
-              totalInliers: Number,
-              totalOutliers: Number): RiskRatioResult = {
-    val exposedInlierCountDouble = Option(exposedInlierCount).map(_.doubleValue()).getOrElse(0.0)
-    val exposedOutlierCountDouble = Option(exposedOutlierCount).map(_.doubleValue()).getOrElse(0.0)
-    val totalInliersDouble = Option(totalInliers).map(_.doubleValue()).getOrElse(0.0)
-    val totalOutliersDouble = Option(totalOutliers).map(_.doubleValue()).getOrElse(0.0)
+  def compute(exposedInlierCount: Double,
+              exposedOutlierCount: Double,
+              totalInliers: Double,
+              totalOutliers: Double): RiskRatioResult = {
+    val exposedInlierCountChecked = {
+      if (exposedInlierCount == -1.0) {
+        0.0
+      }
+      else
+        exposedInlierCount
+    }
 
-    computeDouble(exposedInlierCountDouble, exposedOutlierCountDouble, totalInliersDouble, totalOutliersDouble)
+    val exposedOutlierCountChecked = {
+      if (exposedOutlierCount == -1.0) {
+        0.0
+      }
+      else
+        exposedOutlierCount
+    }
+
+    val totalInliersChecked = {
+      if (totalInliers == -1.0) {
+        0.0
+      }
+      else
+        totalInliers
+    }
+
+    val totalOutliersChecked = {
+      if (totalOutliers == -1.0) {
+        0.0
+      }
+      else
+        totalOutliers
+    }
+
+
+    computeDouble(exposedInlierCountChecked, exposedOutlierCountChecked, totalInliersChecked, totalOutliersChecked)
   }
 }

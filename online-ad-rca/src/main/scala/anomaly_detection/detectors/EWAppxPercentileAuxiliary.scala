@@ -1,7 +1,7 @@
 package anomaly_detection.detectors
 
 import models.{AggregatedRecordsWBaseline, AnomalyEvent}
-import org.apache.flink.api.common.functions.{Function, MapFunction, RichFlatMapFunction, RichMapFunction}
+import org.apache.flink.api.common.functions.RichFlatMapFunction
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.util.Collector
 import utils.Periodic

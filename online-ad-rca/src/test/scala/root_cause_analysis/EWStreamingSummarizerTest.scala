@@ -6,6 +6,7 @@ import config.AppConfig
 import models.{AggregatedRecordsWBaseline, AnomalyEvent, Dimension, RCAResult}
 import org.apache.commons.csv.{CSVFormat, CSVParser}
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment, createTypeInformation}
+import org.junit.Assert.assertEquals
 import org.junit.Test
 import utils.Types
 
@@ -14,7 +15,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
 class EWStreamingSummarizerTest {
-  def readCSV(csvPath: String): List[AggregatedRecordsWBaseline] = {
+  def readCSV(csvPath: String, metric_place: Int): List[AggregatedRecordsWBaseline] = {
     val fileReader = new FileReader(csvPath)
 
     val csvParser = new CSVParser(fileReader, CSVFormat.DEFAULT)
@@ -26,12 +27,12 @@ class EWStreamingSummarizerTest {
 
     for (i <- 1 until csvRecords.size()) {
       val csvRecord = csvRecords.get(i)
-      val metric = csvRecord.get(4)
+      val metric = csvRecord.get(metric_place)
       val currentDimensionBreakdown = mutable.HashMap[Dimension, Types.MetricValue]()
       val dimensionHierarchy = mutable.HashMap[Types.ChildDimension, Types.ParentDimension]()
       for (a <- 0 until headers.size())
       {
-        if (a != 4)
+        if (a != metric_place)
         {
           val attributeName = headers.get(a)
           val dimension = Dimension(attributeName, csvRecord.get(a), group=attributeName, level=1)
@@ -53,10 +54,11 @@ class EWStreamingSummarizerTest {
     // Input Stream Spec
     val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
     AppConfig.enableCheckpoints(env)
-    env.setParallelism(1)
+    val parallelism: Int = 1
+    env.setParallelism(parallelism)
 
     val csvPath = "src/test/resources/low_metric_simple.csv"
-    val records: List[AggregatedRecordsWBaseline] = readCSV(csvPath)
+    val records: List[AggregatedRecordsWBaseline] = readCSV(csvPath, 4)
 
     // Anomaly Detector Spec
     val anomalySpec = new EWAppxPercentileOutlierClassifierSpec()
@@ -67,11 +69,11 @@ class EWStreamingSummarizerTest {
     anomalySpec.decayPeriodType = "TUPLE_BASED"
     anomalySpec.decayPeriod = 50
     anomalySpec.decayRate = 0.01
-    anomalySpec.percentile = 0.80
+    anomalySpec.percentile = 0.99
 
     // Root Cause Analysis Spec
     val batchSize = 1000
-    val attributes = List("A1", "A2", "A3", "A4", "A5")
+    val attributes = List("A1", "A2", "A3", "A4")
     val summarizerSpec = new EWStreamingSummarizerSpec(
       summaryUpdatePeriod = 50,
       decayType = "TUPLE_BASED",
@@ -97,22 +99,165 @@ class EWStreamingSummarizerTest {
     // Input Stream Initialization
     val dataStream: DataStream[AggregatedRecordsWBaseline] = env.fromCollection(records)
 
-    val countStream: DataStream[Int] = dataStream.map(_ => 1)
+    // MAD training
+    val aggregatedRecordsWScore: DataStream[(AggregatedRecordsWBaseline, Double)] = dataStream
+      .flatMap(featureTransform)
 
-//    // MAD training
-//    val aggregatedRecordsWScore: DataStream[(AggregatedRecordsWBaseline, Double)] = dataStream
-//      .flatMap(featureTransform)
-//
-//    // Anomaly Detection
-//    val anomalyEventStream: DataStream[AnomalyEvent] = aggregatedRecordsWScore
-//      .flatMap(detector)
-//
-//    // Root Cause Analysis
-//    summarizer.consume(anomalyStream = anomalyEventStream)
-//    val summaryStream: DataStream[RCAResult] = summarizer.runSearch(env)
-//
-//    // Output
-//    summaryStream.print()
-    env.execute("test MAD Analyzer")
+    // Anomaly Detection
+    val anomalyEventStream: DataStream[AnomalyEvent] = aggregatedRecordsWScore
+      .flatMap(detector)
+
+    // Root Cause Analysis
+    val summaryStream: DataStream[RCAResult] = summarizer.runSearch(anomalyEventStream)
+
+    // Output
+    val summaries: List[RCAResult] = summaryStream.executeAndCollect().toList
+
+    assertEquals(parallelism, summaries.size)
+    assertEquals(1, summaries.head.dimensionSummaries.size)
+    assertEquals("A1", summaries.head.dimensionSummaries.head.dimension.name)
+    assertEquals("0", summaries.head.dimensionSummaries.head.dimension.value)
+  }
+
+  @Test
+  def testSensor10KPower(): Unit = {
+    // Input Stream Spec
+    val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
+    AppConfig.enableCheckpoints(env)
+    val parallelism: Int = 1
+    env.setParallelism(parallelism)
+
+    val csvPath = "src/test/resources/sensor10k_filtered.csv"
+    val records: List[AggregatedRecordsWBaseline] = readCSV(csvPath, 0)
+
+    // Anomaly Detector Spec
+    val anomalySpec = new EWAppxPercentileOutlierClassifierSpec()
+    anomalySpec.sampleSize = 10
+    anomalySpec.warmupCount = 10
+    anomalySpec.trainingPeriodType = "TUPLE_BASED"
+    anomalySpec.trainingPeriod = 1000
+    anomalySpec.decayPeriodType = "TUPLE_BASED"
+    anomalySpec.decayPeriod = 1000
+    anomalySpec.decayRate = 0.01
+    anomalySpec.percentile = 0.99
+
+    // Root Cause Analysis Spec
+    val batchSize = 1000
+    val attributes = List("device_id")
+    val summarizerSpec = new EWStreamingSummarizerSpec(
+      summaryUpdatePeriod = 50,
+      decayType = "TUPLE_BASED",
+      decayRate = 0.01,
+      outlierItemSummarySize = 1000,
+      inlierItemSummarySize = 1000,
+      minOIRatio = 1,
+      minSupport = 0.01,
+      attributes = attributes,
+      attributeCombinations = true,
+      maximumSummaryDelay = batchSize
+    )
+
+    // MAD training Initialization
+    val featureTransform = new EWFeatureTransform(anomalySpec)
+
+    // Anomaly Detection Initialization
+    val detector = new EWAppxPercentileAuxiliary(anomalySpec)
+
+    // Root Cause Analysis Initialization
+    val summarizer = new EWStreamingSummarizer(summarizerSpec, batchSize)
+
+    // Input Stream Initialization
+    val dataStream: DataStream[AggregatedRecordsWBaseline] = env.fromCollection(records)
+
+    // MAD training
+    val aggregatedRecordsWScore: DataStream[(AggregatedRecordsWBaseline, Double)] = dataStream
+      .flatMap(featureTransform)
+
+    // Anomaly Detection
+    val anomalyEventStream: DataStream[AnomalyEvent] = aggregatedRecordsWScore
+      .flatMap(detector)
+
+    // Root Cause Analysis
+    val summaryStream: DataStream[RCAResult] = summarizer.runSearch(anomalyEventStream)
+
+    // Output
+    val summaries: List[RCAResult] = summaryStream.executeAndCollect().toList
+
+    assertEquals(1, summaries.size)
+    assertEquals(1, summaries.head.dimensionSummaries.size)
+    assertEquals("device_id", summaries.head.dimensionSummaries.head.dimension.name)
+    assertEquals("2040", summaries.head.dimensionSummaries.head.dimension.value)
+  }
+
+  @Test
+  def testSensor10KTemp(): Unit = {
+    // Input Stream Spec
+    val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
+    AppConfig.enableCheckpoints(env)
+    val parallelism: Int = 4
+    env.setParallelism(parallelism)
+
+    val csvPath = "src/test/resources/low_metric_sensor10k.csv"
+    val records: List[AggregatedRecordsWBaseline] = readCSV(csvPath, 3)
+
+    // Anomaly Detector Spec
+    val anomalySpec = new EWAppxPercentileOutlierClassifierSpec()
+    anomalySpec.sampleSize = 10
+    anomalySpec.warmupCount = 100
+    anomalySpec.trainingPeriodType = "TUPLE_BASED"
+    anomalySpec.trainingPeriod = 1000
+    anomalySpec.decayPeriodType = "TUPLE_BASED"
+    anomalySpec.decayPeriod = 1000
+    anomalySpec.decayRate = 0.01
+    anomalySpec.percentile = 0.9
+
+    // Root Cause Analysis Spec
+    val batchSize = 1000
+    val attributes = List("device_id", "model", "firmware_version")
+    val summarizerSpec = new EWStreamingSummarizerSpec(
+      summaryUpdatePeriod = 1000,
+      decayType = "TUPLE_BASED",
+      decayRate = 0.01,
+      outlierItemSummarySize = 1000,
+      inlierItemSummarySize = 1000,
+      minOIRatio = 1,
+      minSupport = 0.03,
+      attributes = attributes,
+      attributeCombinations = true,
+      maximumSummaryDelay = batchSize
+    )
+
+    // MAD training Initialization
+    val featureTransform = new EWFeatureTransform(anomalySpec)
+
+    // Anomaly Detection Initialization
+    val detector = new EWAppxPercentileAuxiliary(anomalySpec)
+
+    // Root Cause Analysis Initialization
+    val summarizer = new EWStreamingSummarizer(summarizerSpec, batchSize)
+
+    // Input Stream Initialization
+    val dataStream: DataStream[AggregatedRecordsWBaseline] = env.fromCollection(records)
+
+    // MAD training
+    val aggregatedRecordsWScore: DataStream[(AggregatedRecordsWBaseline, Double)] = dataStream
+      .flatMap(featureTransform)
+
+    // Anomaly Detection
+    val anomalyEventStream: DataStream[AnomalyEvent] = aggregatedRecordsWScore
+      .flatMap(detector)
+
+
+    // Root Cause Analysis
+    val summaryStream: DataStream[RCAResult] = summarizer.runSearch(anomalyEventStream)
+
+    // Output
+    val summaries: List[RCAResult] = summaryStream.executeAndCollect().toList
+    print(summaries)
+
+//    assertEquals(3, summaries.size)
+//    assertEquals(1, summaries.head.dimensionSummaries.size)
+//    assertEquals("device_id", summaries.head.dimensionSummaries.head.dimension.name)
+//    assertEquals("2040", summaries.head.dimensionSummaries.head.dimension.value)
   }
 }
