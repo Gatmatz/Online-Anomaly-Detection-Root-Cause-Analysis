@@ -1,6 +1,9 @@
 package root_cause_analysis
 
-import models.{AggregatedRecordsWBaseline, DimensionSummary, ItemsetWithCount, RCAResult}
+import models.{AggregatedRecordsWBaseline, AnomalyEvent, DimensionSummary, ItemsetWithCount, RCAResult}
+import org.apache.flink.api.common.functions.RichFlatMapFunction
+import org.apache.flink.configuration.Configuration
+import org.apache.flink.util.Collector
 import utils.count.AmortizedMaintenanceCounter
 import utils.encoder.IntegerEncoder
 import utils.itemset.FPTree.StreamingFPGrowth
@@ -15,21 +18,66 @@ class ExponentiallyDecayingEmergingItemsets(
                                            minRatio: Double, // Minimum Risk Ratio
                                            exponentialDecayRate: Double, // Ratio to prune the sketch size
                                            attributeDimension: Int,
-                                           combinationsEnabled: Boolean
-                                           ) extends Serializable {
+                                           combinationsEnabled: Boolean,
+                                           summaryUpdatePeriod: Int,
+                                           summarizationTime: Int
+                                           ) extends RichFlatMapFunction[AnomalyEvent, RCAResult] {
 
   private var numInliers: Double = 0 // Number of inliers observed
   private var numOutliers: Double = 0 // Number of outlier observed
 
-  private val outlierCountSummary: AmortizedMaintenanceCounter = new AmortizedMaintenanceCounter(outlierSummarySize) // AMC sketch for outlier attributes
-  private val inlierCountSummary: AmortizedMaintenanceCounter = new AmortizedMaintenanceCounter(inlierSummarySize) // AMC sketch for inlier attributes
+  private var outlierCountSummary: AmortizedMaintenanceCounter = _ // AMC sketch for outlier attributes
+  private var inlierCountSummary: AmortizedMaintenanceCounter = _ // AMC sketch for inlier attributes
 
-  private val outlierPatternSummary: StreamingFPGrowth = new StreamingFPGrowth(minSupportOutlier) // FPGrowth for producing explanations on the outliers
-  private val inlierPatternSummary: StreamingFPGrowth = new StreamingFPGrowth(0) // FPGrowth for producing explanations on the inliers
+  private var outlierPatternSummary: StreamingFPGrowth = _ // FPGrowth for producing explanations on the outliers
+  private var inlierPatternSummary: StreamingFPGrowth = _ // FPGrowth for producing explanations on the inliers
 
-  private val encoder = new IntegerEncoder() // Integer Encoder for translating the attributes to unique integers.
+  private var encoder: IntegerEncoder = _ // Integer Encoder for translating the attributes to unique integers.
 
   private var interestingItems: mutable.HashMap[Int, Double] = _
+
+  private var summaryCount: Int = _
+  private var updateCount: Int = _
+  private var count: Int = _
+
+  override def open(parameters: Configuration): Unit = {
+    outlierCountSummary = new AmortizedMaintenanceCounter(outlierSummarySize)
+    inlierCountSummary = new AmortizedMaintenanceCounter(inlierSummarySize)
+
+    outlierPatternSummary = new StreamingFPGrowth(minSupportOutlier)
+    inlierPatternSummary  = new StreamingFPGrowth(0)
+
+    encoder = new IntegerEncoder() // Integer Encoder for translating the attributes to unique integers.
+    summaryCount = 0
+    updateCount = 0
+  }
+
+  override def flatMap(value: AnomalyEvent, out: Collector[RCAResult]): Unit = {
+    summaryCount = summaryCount + 1
+    updateCount = updateCount + 1
+
+    if (value.isOutlier)
+    {
+      markOutlier(value.aggregatedRecordsWBaseline)
+    }
+    else
+    {
+      markInlier(value.aggregatedRecordsWBaseline)
+    }
+
+    if (updateCount == summaryUpdatePeriod)
+      {
+        markPeriod()
+        updateCount = 0
+      }
+
+
+    if (summaryCount == summarizationTime)
+      {
+        getItemsets.foreach(out.collect)
+        summaryCount = 0
+      }
+  }
 
   def getInlierCount: Double = {
     numInliers
@@ -235,5 +283,4 @@ class ExponentiallyDecayingEmergingItemsets(
 
     sortedRet.toList
   }
-
 }

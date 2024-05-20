@@ -112,6 +112,8 @@ class EWStreamingSummarizerTest {
     // Output
     val summaries: List[RCAResult] = summaryStream.executeAndCollect().toList
 
+    println(summaries)
+
     assertEquals(parallelism, summaries.size)
     assertEquals(1, summaries.head.dimensionSummaries.size)
     assertEquals("A1", summaries.head.dimensionSummaries.head.dimension.name)
@@ -250,12 +252,11 @@ class EWStreamingSummarizerTest {
 
     // Output
     val summaries: List[RCAResult] = summaryStream.executeAndCollect().toList
-    print(summaries)
 
-//    assertEquals(3, summaries.size)
-//    assertEquals(1, summaries.head.dimensionSummaries.size)
-//    assertEquals("device_id", summaries.head.dimensionSummaries.head.dimension.name)
-//    assertEquals("2040", summaries.head.dimensionSummaries.head.dimension.value)
+    assertEquals(3, summaries.size)
+    assertEquals(1, summaries.head.dimensionSummaries.size)
+    assertEquals("device_id", summaries.head.dimensionSummaries.head.dimension.name)
+    assertEquals("2040", summaries.head.dimensionSummaries.head.dimension.value)
   }
 
   @Test
@@ -264,7 +265,7 @@ class EWStreamingSummarizerTest {
     val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
     AppConfig.enableCheckpoints(env)
 
-    val parallelism: Int = 2
+    val parallelism: Int = 1
     env.setParallelism(parallelism)
 
     // Anomaly Detector Spec
@@ -281,7 +282,7 @@ class EWStreamingSummarizerTest {
     // Root Cause Analysis Spec
     val attributes = AppConfig.InputStream.DIMENSION_NAMES
     val summarizerSpec = EWStreamingSummarizerSpec(
-      summaryUpdatePeriod = 100,
+      summaryUpdatePeriod = 50,
       decayType = "TUPLE_BASED",
       decayRate = 0.01,
       outlierItemSummarySize = 1000,
@@ -297,7 +298,7 @@ class EWStreamingSummarizerTest {
     anomalyDetector.init(anomalySpec)
 
     // Root Cause Analysis Initialization
-    val summarizer = new EWStreamingSummarizer(summarizerSpec, summarizerSpec.summaryUpdatePeriod)
+    val summarizer = new EWStreamingSummarizer(summarizerSpec, 100)
 
     // Input Stream Initialization
     val dataStream: DataStream[InputRecord] = InputRecordStreamBuilder

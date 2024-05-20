@@ -24,7 +24,7 @@ object InputRecordStreamBuilder {
         //case _ => throw new IllegalArgumentException("kafkaOffset can either be earliest, latest or a timestamp")
       }
       env.addSource(kafkaConsumerWithOffset)
-        .setParallelism(env.getParallelism - 1)
+        .setParallelism(env.getParallelism)
         .map(record => buildInputRecord(record))
     }
     inputOrdersStream
