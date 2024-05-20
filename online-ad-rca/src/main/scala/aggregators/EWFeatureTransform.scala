@@ -1,10 +1,10 @@
 package aggregators
 import anomaly_detection.detectors.EWAppxPercentileOutlierClassifierSpec
-import models.{AggregatedRecordsWBaseline, Dimension, InputRecord}
+import models.AggregatedRecordsWBaseline
 import org.apache.flink.api.common.functions.RichFlatMapFunction
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.util.Collector
-import utils.{Periodic, Types}
+import utils.Periodic
 import utils.sample.AdaptableDampedReservoir
 import utils.stats.MAD
 
@@ -31,8 +31,8 @@ class EWFeatureTransform(spec: EWAppxPercentileOutlierClassifierSpec
     scorer = new MAD()
     reservoir = new AdaptableDampedReservoir[AggregatedRecordsWBaseline](spec.sampleSize, spec.decayRate, new Random())
     warmupInput = ListBuffer.empty
-    decayer = new Periodic(spec.decayPeriodType, spec.trainingPeriod, () => scorer.train(reservoir.getReservoir))
-    retrainer = new Periodic(spec.trainingPeriodType, spec.decayPeriod, () => reservoir.advancePeriod())
+    decayer = new Periodic(spec.decayPeriodType, spec.decayPeriod, () => scorer.train(reservoir.getReservoir))
+    retrainer = new Periodic(spec.trainingPeriodType, spec.trainingPeriod, () => reservoir.advancePeriod())
   }
 
   override def flatMap(value: AggregatedRecordsWBaseline, out: Collector[(AggregatedRecordsWBaseline, Double)]): Unit = {

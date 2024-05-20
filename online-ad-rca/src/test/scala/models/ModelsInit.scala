@@ -1,7 +1,6 @@
 package models
 
 import org.scalatest.flatspec.AnyFlatSpec
-import org.scalatest.matchers.should.Matchers
 import utils.Types.{ChildDimension, ParentDimension}
 
 class ModelsInit extends AnyFlatSpec {

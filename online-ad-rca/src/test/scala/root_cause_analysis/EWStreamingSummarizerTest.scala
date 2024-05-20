@@ -3,11 +3,12 @@ package root_cause_analysis
 import aggregators.EWFeatureTransform
 import anomaly_detection.detectors.{EWAppxPercentileAuxiliary, EWAppxPercentileOutlierClassifier, EWAppxPercentileOutlierClassifierSpec}
 import config.AppConfig
-import models.{AggregatedRecordsWBaseline, AnomalyEvent, Dimension, RCAResult}
+import models._
 import org.apache.commons.csv.{CSVFormat, CSVParser}
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment, createTypeInformation}
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import sources.kafka.InputRecordStreamBuilder
 import utils.Types
 
 import java.io.FileReader
@@ -56,7 +57,6 @@ class EWStreamingSummarizerTest {
     AppConfig.enableCheckpoints(env)
     val parallelism: Int = 1
     env.setParallelism(parallelism)
-
     val csvPath = "src/test/resources/low_metric_simple.csv"
     val records: List[AggregatedRecordsWBaseline] = readCSV(csvPath, 4)
 
@@ -83,8 +83,7 @@ class EWStreamingSummarizerTest {
       minOIRatio = 1,
       minSupport = 0.02,
       attributes = attributes,
-      attributeCombinations = true,
-      maximumSummaryDelay = batchSize
+      attributeCombinations = true
     )
 
     // MAD training Initialization
@@ -153,8 +152,7 @@ class EWStreamingSummarizerTest {
       minOIRatio = 1,
       minSupport = 0.01,
       attributes = attributes,
-      attributeCombinations = true,
-      maximumSummaryDelay = batchSize
+      attributeCombinations = true
     )
 
     // MAD training Initialization
@@ -209,7 +207,7 @@ class EWStreamingSummarizerTest {
     anomalySpec.decayPeriodType = "TUPLE_BASED"
     anomalySpec.decayPeriod = 1000
     anomalySpec.decayRate = 0.01
-    anomalySpec.percentile = 0.9
+    anomalySpec.percentile = 0.82
 
     // Root Cause Analysis Spec
     val batchSize = 1000
@@ -221,10 +219,9 @@ class EWStreamingSummarizerTest {
       outlierItemSummarySize = 1000,
       inlierItemSummarySize = 1000,
       minOIRatio = 1,
-      minSupport = 0.03,
+      minSupport = 0.06,
       attributes = attributes,
-      attributeCombinations = true,
-      maximumSummaryDelay = batchSize
+      attributeCombinations = true
     )
 
     // MAD training Initialization
@@ -260,4 +257,60 @@ class EWStreamingSummarizerTest {
 //    assertEquals("device_id", summaries.head.dimensionSummaries.head.dimension.name)
 //    assertEquals("2040", summaries.head.dimensionSummaries.head.dimension.value)
   }
+
+  @Test
+  def testFromKafka(): Unit = {
+    // Input Stream Spec
+    val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
+    AppConfig.enableCheckpoints(env)
+
+    val parallelism: Int = 2
+    env.setParallelism(parallelism)
+
+    // Anomaly Detector Spec
+    val anomalySpec = new EWAppxPercentileOutlierClassifierSpec()
+    anomalySpec.sampleSize = 100 // How big the sample should be
+    anomalySpec.warmupCount = 50
+    anomalySpec.trainingPeriodType = "TUPLE_BASED"
+    anomalySpec.trainingPeriod = 50
+    anomalySpec.decayPeriodType = "TUPLE_BASED"
+    anomalySpec.decayPeriod = 50
+    anomalySpec.decayRate = 0.01
+    anomalySpec.percentile = 0.8
+
+    // Root Cause Analysis Spec
+    val attributes = AppConfig.InputStream.DIMENSION_NAMES
+    val summarizerSpec = EWStreamingSummarizerSpec(
+      summaryUpdatePeriod = 100,
+      decayType = "TUPLE_BASED",
+      decayRate = 0.01,
+      outlierItemSummarySize = 1000,
+      inlierItemSummarySize = 1000,
+      minOIRatio = 1,
+      minSupport = 0.01,
+      attributes = attributes,
+      attributeCombinations = true
+    )
+
+    // Anomaly Detection
+    val anomalyDetector = new EWAppxPercentileOutlierClassifier
+    anomalyDetector.init(anomalySpec)
+
+    // Root Cause Analysis Initialization
+    val summarizer = new EWStreamingSummarizer(summarizerSpec, summarizerSpec.summaryUpdatePeriod)
+
+    // Input Stream Initialization
+    val dataStream: DataStream[InputRecord] = InputRecordStreamBuilder
+      .buildInputRecordStream(env)
+
+    val anomalyEventStream: DataStream[AnomalyEvent] = anomalyDetector.runDetection(dataStream)
+
+    // Root Cause Analysis
+    val summaryStream: DataStream[RCAResult] = summarizer.runSearch(anomalyEventStream)
+
+    summaryStream.print()
+
+    env.execute("Test from Kafka")
+  }
+
 }

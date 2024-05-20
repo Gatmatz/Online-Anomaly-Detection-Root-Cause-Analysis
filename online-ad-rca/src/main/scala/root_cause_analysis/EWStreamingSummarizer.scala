@@ -1,11 +1,13 @@
 package root_cause_analysis
-
 import models.{AnomalyEvent, RCAResult}
+import org.apache.flink.api.common.eventtime.{SerializableTimestampAssigner, WatermarkStrategy}
 import org.apache.flink.api.common.state.{ValueState, ValueStateDescriptor}
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction
-import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment, createTypeInformation}
+import org.apache.flink.streaming.api.scala.{DataStream, createTypeInformation}
 import org.apache.flink.util.Collector
 import utils.Types
+
+import java.time.Duration
 
 class EWStreamingSummarizer(spec: EWStreamingSummarizerSpec, maximumSummaryDelay: Int) extends ContributorsFinder {
 
@@ -20,9 +22,21 @@ class EWStreamingSummarizer(spec: EWStreamingSummarizerSpec, maximumSummaryDelay
 
   private val summaryUpdater = new SummaryUpdater(spec.decayType, spec.summaryUpdatePeriod)
   private val summarizationTimer = new SummarizationTimer(spec.decayType, maximumSummaryDelay)
+  private var needsSummarization = false
 
   def runSearch(anomalyStream: DataStream[AnomalyEvent]): DataStream[RCAResult] = {
     anomalyStream
+      .assignTimestampsAndWatermarks(
+        WatermarkStrategy
+          .forBoundedOutOfOrderness[AnomalyEvent](Duration.ofSeconds(0))
+          .withTimestampAssigner(new SerializableTimestampAssigner[AnomalyEvent] {
+            private var i: Long = 0
+            override def extractTimestamp(event: AnomalyEvent, recordTimestamp: Long): Long = {
+              i = i + 1
+              event.epoch + i
+            }
+          })
+      )
       .keyBy(_ => 0) // Key all events by a constant key to ensure single-threaded processing
       .process(new SummarizationProcessFunction)
   }
@@ -77,6 +91,7 @@ class EWStreamingSummarizer(spec: EWStreamingSummarizerSpec, maximumSummaryDelay
         }
       }
       while (previousPeriod + periodLength < elapsed) {
+        needsSummarization = true
         previousPeriod += periodLength
       }
     }
@@ -101,13 +116,16 @@ class EWStreamingSummarizer(spec: EWStreamingSummarizerSpec, maximumSummaryDelay
         summarizer.markInlier(value.aggregatedRecordsWBaseline)
       }
 
-      // Register a timer to emit summaries after all events have been processed
       ctx.timerService().registerEventTimeTimer(ctx.timestamp())
     }
 
     override def onTimer(timestamp: Long, ctx: KeyedProcessFunction[Int, AnomalyEvent, RCAResult]#OnTimerContext, out: Collector[RCAResult]): Unit = {
-      // Emit all summaries when the timer fires
-      summarizer.getItemsets.foreach(out.collect)
+      if (needsSummarization)
+        {
+          // Emit all summaries when the timer fires
+          summarizer.getItemsets.foreach(out.collect)
+          needsSummarization = false
+        }
     }
   }
 }
