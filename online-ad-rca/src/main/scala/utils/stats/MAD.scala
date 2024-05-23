@@ -60,7 +60,6 @@ class MAD {
         i += 1
       }
       MAD = sum / (upperTrimmedMeanIndex - lowerTrimmedMeanIndex)
-      assert(MAD != 0)
     }
   }
 

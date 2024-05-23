@@ -9,6 +9,7 @@ import org.apache.flink.streaming.api.windowing.assigners.SlidingEventTimeWindow
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.scalatest.flatspec.AnyFlatSpec
 import sources.kafka.InputRecordStreamBuilder
+import transformers.EWFeatureTransform
 
 class EWFeatureTransformTest extends AnyFlatSpec
 {
@@ -20,10 +21,10 @@ class EWFeatureTransformTest extends AnyFlatSpec
     spec.warmupCount = 100
     spec.sampleSize = 1000
     spec.decayPeriodType = "TUPLE_BASED"
-    spec.decayPeriod = 10
+    spec.decayPeriod = 50
     spec.decayRate = 0.01
     spec.trainingPeriodType = "TUPLE_BASED"
-    spec.trainingPeriod = 10
+    spec.trainingPeriod = 50
 
     val inputStream: DataStream[InputRecord] = InputRecordStreamBuilder.buildInputRecordStream(env)
 
@@ -40,7 +41,8 @@ class EWFeatureTransformTest extends AnyFlatSpec
     val featureTransform = new EWFeatureTransform(spec)
 
     val inputRecordsWithNorm: DataStream[(AggregatedRecordsWBaseline, Double)] = aggregatedRecordsWBaselineStream
-      .flatMap(featureTransform)
+      .keyBy(_ => 0)
+      .process(featureTransform)
 
     inputRecordsWithNorm.print()
 

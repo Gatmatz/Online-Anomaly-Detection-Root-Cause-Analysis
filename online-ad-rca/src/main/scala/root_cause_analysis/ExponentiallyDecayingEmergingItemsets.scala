@@ -1,8 +1,9 @@
 package root_cause_analysis
 
-import models.{AggregatedRecordsWBaseline, AnomalyEvent, DimensionSummary, ItemsetWithCount, RCAResult}
-import org.apache.flink.api.common.functions.RichFlatMapFunction
+import models._
+import org.apache.flink.api.common.state.{ValueState, ValueStateDescriptor}
 import org.apache.flink.configuration.Configuration
+import org.apache.flink.streaming.api.functions.KeyedProcessFunction
 import org.apache.flink.util.Collector
 import utils.count.AmortizedMaintenanceCounter
 import utils.encoder.IntegerEncoder
@@ -21,77 +22,187 @@ class ExponentiallyDecayingEmergingItemsets(
                                            combinationsEnabled: Boolean,
                                            summaryUpdatePeriod: Int,
                                            summarizationTime: Int
-                                           ) extends RichFlatMapFunction[AnomalyEvent, RCAResult] {
+                                           ) extends KeyedProcessFunction[Int, AnomalyEvent, RCAResult] {
 
-  private var numInliers: Double = 0 // Number of inliers observed
-  private var numOutliers: Double = 0 // Number of outlier observed
+  private var numInliersState: ValueState[Double] = _ // Number of inliers observed
+  private var numOutliersState: ValueState[Double] = _ // Number of outlier observed
 
-  private var outlierCountSummary: AmortizedMaintenanceCounter = _ // AMC sketch for outlier attributes
-  private var inlierCountSummary: AmortizedMaintenanceCounter = _ // AMC sketch for inlier attributes
+  private var outlierCountSummaryState: ValueState[AmortizedMaintenanceCounter] = _ // AMC sketch for outlier attributes
+  private var inlierCountSummaryState: ValueState[AmortizedMaintenanceCounter] = _ // AMC sketch for inlier attributes
 
-  private var outlierPatternSummary: StreamingFPGrowth = _ // FPGrowth for producing explanations on the outliers
-  private var inlierPatternSummary: StreamingFPGrowth = _ // FPGrowth for producing explanations on the inliers
+  private var outlierPatternSummaryState: ValueState[StreamingFPGrowth] = _ // FPGrowth for producing explanations on the outliers
+  private var inlierPatternSummaryState: ValueState[StreamingFPGrowth] = _ // FPGrowth for producing explanations on the inliers
 
-  private var encoder: IntegerEncoder = _ // Integer Encoder for translating the attributes to unique integers.
+  private var encoderState: ValueState[IntegerEncoder] = _ // Integer Encoder for translating the attributes to unique integers.
 
   private var interestingItems: mutable.HashMap[Int, Double] = _
 
-  private var summaryCount: Int = _
-  private var updateCount: Int = _
-  private var count: Int = _
+  private var tupleCount: Int = _
+
+  private var numInliers: Double = _
+  private var numOutliers: Double = _
+  private var outlierCountSummary: AmortizedMaintenanceCounter = _
+  private var inlierCountSummary: AmortizedMaintenanceCounter = _
+  private var outlierPatternSummary: StreamingFPGrowth = _
+  private var inlierPatternSummary: StreamingFPGrowth = _
+  private var encoder: IntegerEncoder = _
 
   override def open(parameters: Configuration): Unit = {
-    outlierCountSummary = new AmortizedMaintenanceCounter(outlierSummarySize)
-    inlierCountSummary = new AmortizedMaintenanceCounter(inlierSummarySize)
+    // Keep the number of inlier state
+    val numInliersDescriptor = new ValueStateDescriptor[Double](
+      "numInliersState",
+      classOf[Double]
+    )
+    numInliersState = getRuntimeContext.getState(numInliersDescriptor)
 
-    outlierPatternSummary = new StreamingFPGrowth(minSupportOutlier)
-    inlierPatternSummary  = new StreamingFPGrowth(0)
+    // Keep the number of outlier state
+    val numOutliersDescriptor = new ValueStateDescriptor[Double](
+      "numOutliersState",
+      classOf[Double]
+    )
+    numOutliersState = getRuntimeContext.getState(numOutliersDescriptor)
 
-    encoder = new IntegerEncoder() // Integer Encoder for translating the attributes to unique integers.
-    summaryCount = 0
-    updateCount = 0
+    // Keep the outlier count summary state
+    val outlierCountSummaryStateDescriptor = new ValueStateDescriptor[AmortizedMaintenanceCounter](
+      "outlierCountSummaryState",
+      classOf[AmortizedMaintenanceCounter]
+    )
+    outlierCountSummaryState = getRuntimeContext.getState(outlierCountSummaryStateDescriptor)
+
+    // Keep the outlier pattern summary state
+    val inlierCountSummaryStateDescriptor = new ValueStateDescriptor[AmortizedMaintenanceCounter](
+      "inlierCountSummaryState",
+      classOf[AmortizedMaintenanceCounter]
+    )
+    inlierCountSummaryState = getRuntimeContext.getState(inlierCountSummaryStateDescriptor)
+
+
+    // Keep the outlier pattern summary state
+    val outlierPatternSummaryStateDescriptor = new ValueStateDescriptor[StreamingFPGrowth](
+      "outlierPatternSummaryState",
+      classOf[StreamingFPGrowth]
+    )
+    outlierPatternSummaryState = getRuntimeContext.getState(outlierPatternSummaryStateDescriptor)
+
+    // Keep the inlier pattern summary state
+    val inlierPatternSummaryStateDescriptor = new ValueStateDescriptor[StreamingFPGrowth](
+      "inlierPatternSummaryState",
+      classOf[StreamingFPGrowth]
+    )
+    inlierPatternSummaryState = getRuntimeContext.getState(inlierPatternSummaryStateDescriptor)
+
+    // Encoder state
+    val encoderStateDescriptor = new ValueStateDescriptor[IntegerEncoder](
+      "encoderState",
+      classOf[IntegerEncoder]
+    )
+    encoderState = getRuntimeContext.getState(encoderStateDescriptor)
+
+    tupleCount = 0
   }
 
-  override def flatMap(value: AnomalyEvent, out: Collector[RCAResult]): Unit = {
-    summaryCount = summaryCount + 1
-    updateCount = updateCount + 1
+  override def processElement(value: AnomalyEvent, ctx: KeyedProcessFunction[Int, AnomalyEvent, RCAResult]#Context, out: Collector[RCAResult]): Unit = {
+    tupleCount = tupleCount + 1
 
-    if (value.isOutlier)
+    // Fetch inliers count state
+    numInliers = numInliersState.value()
+    if (numInliers == null)
     {
-      markOutlier(value.aggregatedRecordsWBaseline)
-    }
-    else
-    {
-      markInlier(value.aggregatedRecordsWBaseline)
+      numInliers = 0
     }
 
-    if (updateCount == summaryUpdatePeriod)
+    // Fetch outliers count state
+    numOutliers = numOutliersState.value()
+    if (numOutliers == null)
+    {
+      numOutliers = 0
+    }
+
+    // Fetch outlier count summary
+    outlierCountSummary = outlierCountSummaryState.value()
+    if (outlierCountSummary == null)
+      {
+        outlierCountSummary = new AmortizedMaintenanceCounter(outlierSummarySize)
+      }
+
+    // Fetch inlier count summary
+    inlierCountSummary = inlierCountSummaryState.value()
+    if (inlierCountSummary == null)
+    {
+      inlierCountSummary = new AmortizedMaintenanceCounter(inlierSummarySize)
+    }
+
+    // Fetch outlier pattern summary
+    outlierPatternSummary = outlierPatternSummaryState.value()
+    if (outlierPatternSummary == null)
+    {
+      outlierPatternSummary = new StreamingFPGrowth(minSupportOutlier)
+    }
+
+    // Fetch inlier pattern summary
+    inlierPatternSummary = inlierPatternSummaryState.value()
+    if (inlierPatternSummary == null)
+    {
+      inlierPatternSummary = new StreamingFPGrowth(0)
+    }
+
+    encoder = encoderState.value()
+    if (encoder == null)
+      {
+        encoder = new IntegerEncoder()
+      }
+
+
+    // Check summary update time
+    if (tupleCount % summaryUpdatePeriod == 0 & tupleCount != 0)
       {
         markPeriod()
-        updateCount = 0
       }
 
-
-    if (summaryCount == summarizationTime)
+    // Check summarization time
+    if ((tupleCount % summarizationTime == 0) & tupleCount != 0)
       {
         getItemsets.foreach(out.collect)
-        summaryCount = 0
       }
+
+    if (value.isOutlier)
+      {
+        markOutlier(value.aggregatedRecordsWBaseline)
+      }
+    else
+      {
+        markInlier(value.aggregatedRecordsWBaseline)
+      }
+
+    // Update number of inliers
+    numInliersState.update(numInliers)
+
+    // Update number of outliers
+    numOutliersState.update(numOutliers)
+
+    // Update outlier count summary
+    outlierCountSummaryState.update(outlierCountSummary)
+
+    // Update inlier count summary
+    inlierCountSummaryState.update(inlierCountSummary)
+
+    // Update outlier pattern summary
+    outlierPatternSummaryState.update(outlierPatternSummary)
+
+    // Update inlier pattern summary
+    inlierPatternSummaryState.update(inlierPatternSummary)
+
+    // Update encoder
+    encoderState.update(encoder)
   }
 
-  def getInlierCount: Double = {
-    numInliers
-  }
-  def getOutlierCount: Double = {
-    numOutliers
-  }
 
   def updateModelsNoDecay(): Unit = {
-    updateModels(false)
+    updateModels(doDecay = false)
   }
 
   private def updateModelsAndDecay(): Unit = {
-    updateModels(true)
+    updateModels(doDecay = true)
   }
 
   private def updateModels(doDecay: Boolean): Unit = {
@@ -100,10 +211,10 @@ class ExponentiallyDecayingEmergingItemsets(
         return
       }
 
-    val outlierCounts: mutable.HashMap[Int, Double] = this.outlierCountSummary.getCounts
-    val inlierCounts: mutable.HashMap[Int, Double] = this.inlierCountSummary.getCounts
+    val outlierCounts: mutable.HashMap[Int, Double] = outlierCountSummary.getCounts
+    val inlierCounts: mutable.HashMap[Int, Double] = inlierCountSummary.getCounts
 
-    val supportCountRequired: Int = (this.outlierCountSummary.getTotalCount * minSupportOutlier).toInt
+    val supportCountRequired: Int = (outlierCountSummary.getTotalCount * minSupportOutlier).toInt
 
     interestingItems = mutable.HashMap()
 
@@ -135,7 +246,7 @@ class ExponentiallyDecayingEmergingItemsets(
 
   }
 
-  def markPeriod(): Unit = {
+  private def markPeriod(): Unit = {
     outlierCountSummary.multiplyAllCounts(1 - exponentialDecayRate)
     inlierCountSummary.multiplyAllCounts(1 - exponentialDecayRate)
 
@@ -149,7 +260,7 @@ class ExponentiallyDecayingEmergingItemsets(
     }).toList
   }
 
-  def markOutlier(outlierEvent: AggregatedRecordsWBaseline): Unit = {
+  private def markOutlier(outlierEvent: AggregatedRecordsWBaseline): Unit = {
     numOutliers = numOutliers + 1
     val attributes: List[Int] = getIntegerAttributes(outlierEvent)
     outlierCountSummary.observe(attributes)
@@ -159,7 +270,7 @@ class ExponentiallyDecayingEmergingItemsets(
     }
   }
 
-  def markInlier(inlierEvent: AggregatedRecordsWBaseline): Unit = {
+  private def markInlier(inlierEvent: AggregatedRecordsWBaseline): Unit = {
     numInliers = numInliers + 1
     val attributes: List[Int] = getIntegerAttributes(inlierEvent)
     inlierCountSummary.observe(attributes)

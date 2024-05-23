@@ -2,8 +2,8 @@ package root_cause_analysis
 import models.{AnomalyEvent, RCAResult}
 import org.apache.flink.streaming.api.scala.{DataStream, createTypeInformation}
 
-class EWStreamingSummarizer(spec: EWStreamingSummarizerSpec, maximumSummaryDelay: Int) extends ContributorsFinder {
-  def runSearch(anomalyStream: DataStream[AnomalyEvent]): DataStream[RCAResult] = {
+class EWStreamingSummarizer(spec: EWStreamingSummarizerSpec, maximumSummaryDelay: Int) extends SimpleContributorsFinder {
+  override def runSearch(anomalyStream: DataStream[AnomalyEvent]): DataStream[RCAResult] = {
     val summarizer: ExponentiallyDecayingEmergingItemsets = new ExponentiallyDecayingEmergingItemsets(
       spec.inlierItemSummarySize,
       spec.outlierItemSummarySize,
@@ -16,6 +16,8 @@ class EWStreamingSummarizer(spec: EWStreamingSummarizerSpec, maximumSummaryDelay
       maximumSummaryDelay
     )
 
-    anomalyStream.flatMap(summarizer)
+    anomalyStream
+      .keyBy(_ => 0)
+      .process(summarizer)
   }
 }

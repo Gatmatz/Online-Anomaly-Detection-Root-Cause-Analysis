@@ -163,22 +163,20 @@ class StreamingFPTree extends Serializable {
       frequentItemCounts -= item
       frequentItemOrder -= item
 
-      var nodeToDelete: FPTreeNode = nodeHeaders(item)
+      var nodeToDelete = nodeHeaders.getOrElse(item, null)
 
-      while(nodeToDelete != null)
+      while(nodeToDelete != null) {
+        nodeToDelete.parent.removeChild(nodeToDelete)
+        if (nodeToDelete.hasChildren)
         {
-          nodeToDelete.parent.removeChild(nodeToDelete)
-
-          if (nodeToDelete.hasChildren)
-            {
-              nodeToDelete.parent.mergeChildren(nodeToDelete.getChildren)
-            }
-
-          leafNodes.remove(nodeToDelete)
-
-          nodeToDelete = nodeToDelete.getNextLink
+          nodeToDelete.parent.mergeChildren(nodeToDelete.getChildren)
         }
-      nodeHeaders.remove(item)
+        leafNodes.remove(nodeToDelete)
+        nodeToDelete = nodeToDelete.getNextLink
+        }
+
+      val deleted = nodeHeaders.remove(item)
+
     }
   }
 

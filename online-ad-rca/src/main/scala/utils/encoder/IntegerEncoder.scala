@@ -16,7 +16,6 @@ class IntegerEncoder extends Serializable {
   /**
    * Creates or retrieves an integer encoding for a given attribute.
    * @param dimension the dimension key of the attribute
-   * @param attr the attribute of the dimension
    * @return an integer representation of the attribute
    */
   def getIntegerEncoding(dimension: Dimension): Int = {
@@ -44,10 +43,9 @@ class IntegerEncoder extends Serializable {
       }
     }
 
-//    val group: Types.DimensionGroup = AppConfig.InputStream.DIMENSION_DEFINITIONS.getConfig(dimensionName).getString("group")
-//    val level: Types.DimensionLevel = AppConfig.InputStream.DIMENSION_LEVELS(dimensionName)
+    val group: Types.DimensionGroup = AppConfig.InputStream.DIMENSION_DEFINITIONS.getConfig(dimensionName).getString("group")
+    val level: Types.DimensionLevel = AppConfig.InputStream.DIMENSION_LEVELS(dimensionName)
 
-//    Dimension(dimensionName, attribute, group, level)
-      Dimension(dimensionName, attribute, "column", 1)
+    Dimension(dimensionName, attribute, group, level)
   }
 }

@@ -1,12 +1,13 @@
 package anomaly_detection.detectors
 
-import aggregators.{EWFeatureTransform, OffsetBaselineAggregator}
+import aggregators.OffsetBaselineAggregator
 import aggregators.metric_aggregators.SumAggregator
 import anomaly_detection.AnomalyDetector
 import models.{AggregatedRecords, AggregatedRecordsWBaseline, AnomalyEvent, InputRecord}
 import org.apache.flink.streaming.api.scala.{DataStream, createTypeInformation}
 import org.apache.flink.streaming.api.windowing.assigners.SlidingEventTimeWindows
 import org.apache.flink.streaming.api.windowing.time.Time
+import transformers.EWFeatureTransform
 
 /**
  * Exponentially weighted approximate percentile-based streaming classifier from Macrobase.
@@ -37,7 +38,8 @@ class EWAppxPercentileOutlierClassifier extends AnomalyDetector[EWAppxPercentile
 
     // Train MAD using ADR and assign scores to every InputRecord
     val aggregatedStreamWScore: DataStream[(AggregatedRecordsWBaseline, Double)] = aggregatedRecordsWBaselineStream
-      .flatMap(featureTransform)
+      .keyBy(_ => 0)
+      .process(featureTransform)
 
     // Initialize the AD Detector
     val detector = new EWAppxPercentileAuxiliary(spec)
@@ -46,7 +48,8 @@ class EWAppxPercentileOutlierClassifier extends AnomalyDetector[EWAppxPercentile
     // indicating if the Record is an Anomaly or not.
     // The Anomalies are filtered and then they are translated to AnomalyEvent instances.
     val anomalyEventStream: DataStream[AnomalyEvent] = aggregatedStreamWScore
-      .flatMap(detector)  // Detect each AggregatedRecordWBaseline to Anomaly or Not
+      .keyBy(_ => 0)
+      .process(detector)  // Detect each AggregatedRecordWBaseline to Anomaly or Not
 
     anomalyEventStream
   }
