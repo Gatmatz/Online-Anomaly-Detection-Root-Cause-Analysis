@@ -14,17 +14,22 @@ import scala.util.Random
 
 /**
  * Class that trains a MAD model using ADR (sampling the stream).
- * The class is a FlatMap that accepts a Stream of AggregatedRecordsWBaseline and emits a Stream of tuples in the
+ *
+ * The class is a KeyedProcessFunction that has Integer as keys, accepts a Stream of AggregatedRecordsWBaseline and emits a Stream of tuples in the
  * form of (AggregatedRecordsWBaseline, Score).
- * @param spec the specifications of MAD's trainer
+ *
+ * The MAD trainer uses the median and the Median Absolute Deviation (MAD).
+ * The MAD measures the median of the absolute distance from each point in the sample to the sample median.
+ *
+ * @param spec specifications of the Anomaly Detection module that contains a subset of specifications for the MAD trainer.
  */
 class EWFeatureTransform(spec: EWAppxPercentileOutlierClassifierSpec
                         ) extends KeyedProcessFunction[Int, AggregatedRecordsWBaseline, (AggregatedRecordsWBaseline, Double)] {
 
-  private var reservoirState: ValueState[AdaptableDampedReservoir[AggregatedRecordsWBaseline]] = _
-  private var scorerState: ValueState[MAD] = _
-  private var warmupInput: ListBuffer[AggregatedRecordsWBaseline] = _
-  private var tupleCount: Int = 0
+  private var reservoirState: ValueState[AdaptableDampedReservoir[AggregatedRecordsWBaseline]] = _ // State of the reservoir for the sampling.
+  private var scorerState: ValueState[MAD] = _ // State of the MAD trainer.
+  private var warmupInput: ListBuffer[AggregatedRecordsWBaseline] = _ // State of the buffer for the first training.
+  private var tupleCount: Int = 0 // Number of input records that have been observed
 
   override def open(parameters: Configuration): Unit = {
     // Keep the ADR State
@@ -55,7 +60,7 @@ class EWFeatureTransform(spec: EWAppxPercentileOutlierClassifierSpec
     var reservoir = reservoirState.value()
     if (reservoir == null)
       {
-        reservoir = new AdaptableDampedReservoir[AggregatedRecordsWBaseline](spec.sampleSize, spec.decayRate, new Random())
+        reservoir = new AdaptableDampedReservoir[AggregatedRecordsWBaseline](spec.sampleSize, spec.decayRate, new Random(seed = 0))
       }
 
     // Fetch scorer state
@@ -71,12 +76,12 @@ class EWFeatureTransform(spec: EWAppxPercentileOutlierClassifierSpec
         reservoir.insert(value)
 
         // Check retrainer
-        if (tupleCount % spec.trainingPeriod == 0)
-          reservoir.advancePeriod()
+        if (tupleCount % (spec.trainingPeriod + 1) == 0)
+          scorer.train(reservoir.getReservoir)
 
         // Check decayer
-        if (tupleCount % spec.decayPeriod == 0)
-          scorer.train(reservoir.getReservoir)
+        if (tupleCount % (spec.decayPeriod + 1) == 0)
+          reservoir.advancePeriod()
       }
     else
       {
@@ -90,12 +95,12 @@ class EWFeatureTransform(spec: EWAppxPercentileOutlierClassifierSpec
           }
 
         // Check retrainer
-        if (tupleCount % spec.trainingPeriod.toInt == 0)
-          reservoir.advancePeriod()
+        if (tupleCount % (spec.trainingPeriod + 1) == 0)
+          scorer.train(reservoir.getReservoir)
 
         // Check decayer
-        if (tupleCount % spec.decayPeriod.toInt == 0)
-          scorer.train(reservoir.getReservoir)
+        if (tupleCount % (spec.decayPeriod + 1) == 0)
+          reservoir.advancePeriod()
 
         reservoir.insert(value)
         out.collect((value,scorer.score(value)))

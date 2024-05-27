@@ -78,9 +78,10 @@ class StreamingFPGrowthTest {
     assertEquals(797, itemsets.size)
   }
 
+  @Test
   def stress(): Unit = {
     val fp = new StreamingFPGrowth(.001)
-    val random = new Random(0)
+    val random = new Random(seed = 0)
     var cnt = 0
 
     var frequentItems = new mutable.HashMap[Int, Double]()

@@ -33,6 +33,9 @@ class HierarchicalContributorsFinder extends ContributorsFinder {
       anomalyEvent.detectedAt,
       currentTotal,
       baselineTotal,
+      0.0,
+      0.0,
+      0.0,
       dimensionGroup,
       computeSummaries(
         currentTotal,

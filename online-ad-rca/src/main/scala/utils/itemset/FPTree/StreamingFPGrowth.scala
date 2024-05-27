@@ -5,6 +5,10 @@ import models.ItemsetWithCount
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
+/**
+ * Driver class for FPGrowth algorithm on a streaming environment.
+ * @param support the minimum support required
+ */
 class StreamingFPGrowth(support: Double) extends Serializable {
 
   val fp: StreamingFPTree = new StreamingFPTree()
@@ -63,7 +67,8 @@ class StreamingFPGrowth(support: Double) extends Serializable {
 
     val ret = ListBuffer[ItemsetWithCount]()
     for (target <- targets) {
-      ret += new ItemsetWithCount(target.getItems, fp.getSupport(target.getItems.toList))
+      val count = fp.getSupport(target.getItems.toList)
+      ret += new ItemsetWithCount(target.getItems, count)
     }
     ret.toList
   }

@@ -61,7 +61,7 @@ class EWAppxPercentileAuxiliary(spec: EWAppxPercentileOutlierClassifierSpec)
     var reservoir = reservoirState.value()
     if (reservoir == null)
     {
-      reservoir = new AdaptableDampedReservoir[(AggregatedRecordsWBaseline, Double)](spec.sampleSize, spec.decayRate, new Random())
+      reservoir = new AdaptableDampedReservoir[(AggregatedRecordsWBaseline, Double)](spec.sampleSize, spec.decayRate, new Random(seed = 0))
     }
 
     // Fetch threshold state
@@ -77,11 +77,11 @@ class EWAppxPercentileAuxiliary(spec: EWAppxPercentileOutlierClassifierSpec)
         reservoir.insert(value)
 
         // Check reservoir decayer
-        if (tupleCount % spec.decayPeriod.toInt == 0)
+        if (tupleCount % (spec.decayPeriod + 1) == 0)
           reservoir.advancePeriod()
 
         // Check threshold updater
-        if (tupleCount % spec.trainingPeriod.toInt == 0)
+        if (tupleCount % (spec.trainingPeriod + 1) == 0)
           currentThreshold = updateThreshold(reservoir, spec.percentile)
       }
     else
@@ -90,7 +90,7 @@ class EWAppxPercentileAuxiliary(spec: EWAppxPercentileOutlierClassifierSpec)
           {
             currentThreshold = updateThreshold(reservoir, spec.percentile)
             for (record <- warmupInput) {
-              val isAnomaly: Boolean = record._2 > currentThreshold
+              val isAnomaly: Boolean = value._2 > currentThreshold
               out.collect(AnomalyEvent(record._1, isAnomaly))
             }
             warmupInput.clear

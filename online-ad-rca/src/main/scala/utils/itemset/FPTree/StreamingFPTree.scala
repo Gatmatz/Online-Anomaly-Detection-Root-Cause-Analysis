@@ -175,8 +175,7 @@ class StreamingFPTree extends Serializable {
         nodeToDelete = nodeToDelete.getNextLink
         }
 
-      val deleted = nodeHeaders.remove(item)
-
+      nodeHeaders.remove(item)
     }
   }
 
@@ -218,7 +217,7 @@ class StreamingFPTree extends Serializable {
     if (!isStreaming) {
       txn.sortBy(i => (-1) * frequentItemOrder.getOrElse(i, Int.MinValue))
     } else {
-      txn.sortBy(i => -frequentItemOrder.getOrElse(i, -i))
+      txn.sortBy(i => (-1) * frequentItemOrder.getOrElse(i, -i))
     }
   }
 
@@ -254,13 +253,15 @@ class StreamingFPTree extends Serializable {
         }
       }
 
-    var filtered: List[Int] = transaction.filter(frequentItemCounts.contains).toList
+    var filtered: List[Int] = transaction
+      .filter(p => frequentItemCounts.contains(p))
+      .toList
 
     if (filtered.nonEmpty)
       {
         if (streaming && filterExistingFrequentItemsOnly)
           {
-            for (item <- transaction) {
+            for (item <- filtered) {
               frequentItemCounts.update(item, frequentItemCounts.getOrElse(item, 0.0) + 1)
             }
           }

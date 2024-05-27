@@ -9,15 +9,21 @@ import java.time.LocalDateTime
                       detectedAt: LocalDateTime,
                       currentTotal: Double,
                       baselineTotal: Double,
+                      support: Double,
+                      numRecords: Double,
+                      ratioToInliers: Double,
                       dimensionGroup: String,
                       dimensionSummaries: List[DimensionSummary]
                     ) {
   override def toString: String = {
-    "RCAResult(relatedAnomalyId=%s, detectedAt=%s, currentTotal=%s, baselineTotal=%s, dimensionGroup=%s, dimensionSummaries=%s)".format(
+    "RCAResult(relatedAnomalyId=%s, detectedAt=%s, currentTotal=%s, baselineTotal=%s, support=%s, numRecords=%s, ratioToInliers=%s, dimensionGroup=%s, dimensionSummaries=%s)".format(
       relatedAnomalyId,
       detectedAt,
       currentTotal,
       baselineTotal,
+      support,
+      numRecords,
+      ratioToInliers,
       dimensionGroup,
       dimensionSummaries.mkString(", ")
     )
@@ -29,6 +35,9 @@ import java.time.LocalDateTime
     node.put("detectedAt", detectedAt.toString)
     node.put("currentTotal", currentTotal)
     node.put("baselineTotal", baselineTotal)
+    node.put("support", support)
+    node.put("numRecords", numRecords)
+    node.put("ratioToInliers", ratioToInliers)
     node.put("dimensionGroup", dimensionGroup)
 
     // create an array for dimensionSummaries

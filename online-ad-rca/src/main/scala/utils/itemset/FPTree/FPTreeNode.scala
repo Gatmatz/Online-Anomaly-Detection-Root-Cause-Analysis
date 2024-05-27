@@ -141,6 +141,8 @@ class FPTreeNode(item: Int,
     // O(N^2); slow for large lists; consider optimizing
     for (otherChild <- otherChildren)
     {
+      if (otherChild.getItem == 63)
+        println(otherChild.getItem)
       otherChild.parent = this
       var matched: Boolean = false
       breakable { // Use breakable to be able to break out of the loop

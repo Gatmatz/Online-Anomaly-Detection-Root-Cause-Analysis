@@ -1,8 +1,11 @@
 package utils.stats
 
-import models.{AggregatedRecordsWBaseline, InputRecord}
-
+import models.AggregatedRecordsWBaseline
 import scala.util.Sorting
+
+/**
+ *
+ */
 class MAD {
   private var median: Double = _
   private var MAD: Double = _

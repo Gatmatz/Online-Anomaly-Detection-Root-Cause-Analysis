@@ -154,13 +154,14 @@ class ExponentiallyDecayingEmergingItemsets(
 
 
     // Check summary update time
-    if (tupleCount % summaryUpdatePeriod == 0 & tupleCount != 0)
+    if (tupleCount % (summaryUpdatePeriod + 1) == 0 & tupleCount != 0)
       {
         markPeriod()
       }
 
+
     // Check summarization time
-    if ((tupleCount % summarizationTime == 0) & tupleCount != 0)
+    if ((tupleCount % (summarizationTime + 1) == 0) & tupleCount != 0)
       {
         getItemsets.foreach(out.collect)
       }
@@ -302,8 +303,8 @@ class ExponentiallyDecayingEmergingItemsets(
                 val outlierCountValue: Double = value
                 val support = outlierCountValue / outlierCountSummary.getTotalCount
                 val dimension = encoder.getAttribute(key)
-                val dimensionSummary = DimensionSummary(dimension, support, support, ratio, outlierCountValue, outlierCountValue, outlierCountValue)
-                ret += RCAResult(null, null, outlierCountValue, ratio, "1", List(dimensionSummary))
+                val dimensionSummary = DimensionSummary(dimension, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+                ret += RCAResult(null, null, 0.0, 0.0, support, outlierCountValue, ratio, "all", List(dimensionSummary))
               }
           }
       }
@@ -330,28 +331,24 @@ class ExponentiallyDecayingEmergingItemsets(
     val ratioSetsToCheck: mutable.ListBuffer[ItemsetWithCount] = mutable.ListBuffer.empty[ItemsetWithCount]
     val ret: ListBuffer[RCAResult] = singleItemsets
 
-    var prevSet: mutable.Set[Int] = null
+    var prevSet: Option[mutable.Set[Int]] = None
     var prevCount: Double = -1.0
 
     for (i <- iwc) {
-      if (i.getCount == prevCount)
-        {
-          if (prevSet != null && (i.getItems diff prevSet).isEmpty)
-          {
-            // continue
-          }
-          else
-            {
-              prevCount = i.getCount
-              prevSet = i.getItems
-
-              if (i.getItems.size != 1)
-                {
-                  ratioItemsToCheck ++= i.getItems
-                  ratioSetsToCheck += i
-                }
-            }
+      if (i.getCount == prevCount) {
+        prevSet match {
+          case Some(ps) if ps.diff(i.getItems).isEmpty => // continue
+          case _ =>
         }
+      }
+
+      prevCount = i.getCount
+      prevSet = Some(i.getItems)
+
+      if (i.getItems.size != 1) {
+        ratioItemsToCheck ++= i.getItems
+        ratioSetsToCheck += i
+      }
     }
 
     val matchingInlierCounts: List[ItemsetWithCount] = inlierPatternSummary.getCounts(ratioSetsToCheck.toList)
@@ -375,11 +372,11 @@ class ExponentiallyDecayingEmergingItemsets(
 
           for (item <- oc.getItems) {
             val dimension = encoder.getAttribute(item)
-            val dimensionSummary = DimensionSummary(dimension, support, support, ratio, outlierCountValue, outlierCountValue, outlierCountValue)
+            val dimensionSummary = DimensionSummary(dimension, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
             attributeSummaries += dimensionSummary
           }
 
-          val summary = RCAResult(null, null, outlierCountValue, ratio, "1", attributeSummaries.toList)
+          val summary = RCAResult(null, null, 0.0, 0.0, support, outlierCountValue, ratio, "all", attributeSummaries.toList)
           ret += summary
         }
     }

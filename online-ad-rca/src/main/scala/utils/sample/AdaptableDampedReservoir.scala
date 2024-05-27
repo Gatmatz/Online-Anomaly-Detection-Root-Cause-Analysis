@@ -8,9 +8,10 @@ import scala.util.Random
  */
 class AdaptableDampedReservoir[T](capacity:Int,
                                   bias:Double,
-                                  random: Random = new Random()) extends AChao[T](capacity, random) {
+                                  random: Random) extends AChao[T](capacity, random) {
   require(bias >= 0 && bias < 1, "Bias parameter must be between 0 and 1.")
-  def this(capacity: Int, bias: Double) = this(capacity, bias, new Random())
+
+  def this(capacity: Int, bias: Double) = this(capacity, bias, new Random(seed=0))
 
   def advancePeriod(): Unit = {
     advancePeriod(1)

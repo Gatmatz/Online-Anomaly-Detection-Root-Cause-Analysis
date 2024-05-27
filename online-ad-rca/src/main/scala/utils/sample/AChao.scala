@@ -4,13 +4,13 @@ import scala.collection.mutable
 import scala.util.Random
 
 class AChao[T](capacity: Int,
-               random: Random = new Random) extends Serializable {
+               random: Random) extends Serializable {
   private var runningCount: Double = 0
   private val reservoir: mutable.ListBuffer[T] = mutable.ListBuffer()
   private val reservoirCapacity: Int = capacity
   private val overweightItems: mutable.PriorityQueue[OverweightRecord] = mutable.PriorityQueue.empty(Ordering[OverweightRecord])
 
-  def this(capacity: Int) = this(capacity, new Random())
+  def this(capacity: Int) = this(capacity, new Random(seed=0))
   def insert(record:T, weight:Double): Unit = {
     runningCount = runningCount + weight
 
