@@ -84,24 +84,28 @@ class StreamingFPGrowthTest {
     val random = new Random(seed = 0)
     var cnt = 0
 
-    var frequentItems = new mutable.HashMap[Int, Double]()
+    val frequentItems = new mutable.HashMap[Int, Double]()
     while (cnt <= 1000) {
       val itemSetSize = random.nextInt(100)
       val itemSet = mutable.Set[Int]()
-      for (_ <- 0 until itemSetSize) {
+      for (i <- 0 until itemSetSize) {
         itemSet.add(random.nextInt(100))
-        frequentItems(cnt) = frequentItems.getOrElse(cnt, 0.0) + 1
+        frequentItems(i) = frequentItems.getOrElse(i, 0.0) + 1
       }
 
       fp.insertTransactionFalseNegative(itemSet.toSet)
 
-      if (cnt % 20 == 0) {
-        val toDecay = random.nextInt(frequentItems.size)
-        for (_ <- 0 until toDecay) {
-          frequentItems.remove(frequentItems.keySet.toSeq(random.nextInt(frequentItems.size)))
-        }
-        fp.decayAndResetFrequentItems(frequentItems, .95)
-      }
+      fp.printTreeDebug()
+
+//      if (cnt % 20 == 0) {
+//        val toDecay = random.nextInt(frequentItems.size)
+//        for (_ <- 0 until toDecay) {
+//          val frequentItemsArray = frequentItems.toArray
+//          val randomIndex = random.nextInt(frequentItems.size)
+//          frequentItems.remove(frequentItemsArray(randomIndex)._1)
+//        }
+//        fp.decayAndResetFrequentItems(frequentItems, .95)
+//      }
       cnt += 1
     }
   }

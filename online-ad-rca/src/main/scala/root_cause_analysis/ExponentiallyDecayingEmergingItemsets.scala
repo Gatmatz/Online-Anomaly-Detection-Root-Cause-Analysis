@@ -353,7 +353,6 @@ class ExponentiallyDecayingEmergingItemsets(
 
     val matchingInlierCounts: List[ItemsetWithCount] = inlierPatternSummary.getCounts(ratioSetsToCheck.toList)
 
-
     assert(matchingInlierCounts.size == ratioSetsToCheck.size)
     for (i <- matchingInlierCounts.indices) {
       val ic: ItemsetWithCount = matchingInlierCounts(i)

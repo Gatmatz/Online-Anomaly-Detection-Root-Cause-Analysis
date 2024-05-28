@@ -43,10 +43,10 @@ class IntegerEncoder extends Serializable {
       }
     }
 
-//    val group: Types.DimensionGroup = AppConfig.InputStream.DIMENSION_DEFINITIONS.getConfig(dimensionName).getString("group")
-//    val level: Types.DimensionLevel = AppConfig.InputStream.DIMENSION_LEVELS(dimensionName)
-    val group: String = "column"
-    val level: Int = 1
+    val group: Types.DimensionGroup = AppConfig.InputStream.DIMENSION_DEFINITIONS.getConfig(dimensionName).getString("group")
+    val level: Types.DimensionLevel = AppConfig.InputStream.DIMENSION_LEVELS(dimensionName)
+//    val group: String = "column"
+//    val level: Int = 1
 
     Dimension(dimensionName, attribute, group, level)
   }

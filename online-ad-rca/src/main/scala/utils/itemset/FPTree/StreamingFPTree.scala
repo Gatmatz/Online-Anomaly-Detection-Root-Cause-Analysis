@@ -78,7 +78,7 @@ class StreamingFPTree extends Serializable {
                    decayWeight: Double): Unit = {
      if (start == root) {
        for ((item, count) <- frequentItemCounts) {
-         frequentItemCounts.put(item, count * decayWeight)
+         frequentItemCounts.update(item, count * decayWeight)
        }
      }
 
@@ -160,8 +160,8 @@ class StreamingFPTree extends Serializable {
       }
 
     for (item <- itemsToDelete) {
-      frequentItemCounts -= item
-      frequentItemOrder -= item
+      frequentItemCounts.remove(item)
+      frequentItemOrder.remove(item)
 
       var nodeToDelete = nodeHeaders.getOrElse(item, null)
 
@@ -187,11 +187,12 @@ class StreamingFPTree extends Serializable {
     // We have to materialize a canonical order so that items with equal counts
     // are consistently ordered when they are sorted during transaction insertion
     var sortedItemCounts = frequentItemCounts.toList
-    sortedItemCounts = sortedItemCounts.sortBy(entry => frequentItemCounts(entry._1))
+    sortedItemCounts = sortedItemCounts.sortBy{ case (id, value) => (value, id) }
 
     // Populate the frequentItemOrder map
-    sortedItemCounts.zipWithIndex.foreach { case ((key, _), index) =>
-      frequentItemOrder(key) = index
+    for (i <- 0 until sortedItemCounts.size)
+    {
+      frequentItemOrder.put(sortedItemCounts(i)._1, i)
     }
   }
 
@@ -276,7 +277,7 @@ class StreamingFPTree extends Serializable {
 
     if (node.getPrevLink == null)
       {
-        assert(nodeHeaders(node.getItem) == node)
+        assert(nodeHeaders.getOrElse(node.getItem, null) == node)
         nodeHeaders.put(node.getItem, node.getNextLink)
       }
     else
@@ -333,7 +334,6 @@ class StreamingFPTree extends Serializable {
           if (minSupportInSubset == -1 || n.getCount < minSupportInSubset)
             minSupportInSubset = n.getCount
         }
-
         assert(minSupportInSubset >= supportCountRequired)
         singlePathItemsets += new ItemsetWithCount(items, minSupportInSubset)
       }
@@ -427,84 +427,75 @@ class StreamingFPTree extends Serializable {
 
   def sortByNewOrder(): Unit = {
     // We need to walk the tree from each leaf to each root
-    val leavesToInspect: ListBuffer[FPTreeNode] = ListBuffer(leafNodes.toList: _*)
-    var removedNodes = Set[FPTreeNode]()
+    val leavesToInspect = new ListBuffer[FPTreeNode]()
+    leavesToInspect ++= leafNodes.toList
+    val removedNodes = mutable.HashSet[FPTreeNode]()
     for (leaf <- leavesToInspect) {
-      if (leaf == root)
-        {
+      breakable {
+        if (leaf == root)
+          break
 
-        }
-      else
-        {
-          if (removedNodes.contains(leaf) || sortedNodes.contains(leaf))
-            {
+        if (removedNodes.contains(leaf) || sortedNodes.contains(leaf))
+          break
 
+        val leafCount: Double = leaf.count
+        val toInsert = mutable.HashSet[Int]()
+
+        toInsert.add(leaf.getItem)
+        assert(!leaf.hasChildren)
+
+        removeNodeFromHeaders(leaf)
+
+        removedNodes.add(leaf)
+
+        var curLowestNodeOrder: Int = frequentItemOrder.getOrElse(leaf.getItem, -1)
+
+        assert(curLowestNodeOrder != -1)
+
+        var node: FPTreeNode = leaf.getParent
+        node.removeChild(leaf)
+
+        breakable {
+          while (true) {
+            if (node == root)
+              break
+
+            val nodeOrder: Int = frequentItemOrder.getOrElse(node.getItem, -1)
+
+            assert(nodeOrder != -1)
+
+            if (sortedNodes.contains(node) && nodeOrder < curLowestNodeOrder) {
+              break
             }
-          else
-            {
-              val leafCount: Double = leaf.count
-              val toInsert = mutable.Set[Int]()
-
-              toInsert += leaf.getItem
-
-              assert(!leaf.hasChildren)
-
-              removeNodeFromHeaders(leaf)
-
-              removedNodes += leaf
-
-              var curLowestNodeOrder: Int = frequentItemOrder.getOrElse(leaf.getItem, -1)
-
-              var node: FPTreeNode = leaf.getParent
-              node.removeChild(leaf)
-
-              breakable {
-                while(true)
-                  {
-                    if (node == root)
-                      break()
-
-                    val nodeOrder: Int = frequentItemOrder.getOrElse(node.getItem, -1)
-
-                    if (sortedNodes.contains(node) && nodeOrder < curLowestNodeOrder)
-                      {
-                        break()
-                      }
-                    else if (nodeOrder < curLowestNodeOrder)
-                      {
-                        curLowestNodeOrder = nodeOrder
-                      }
-
-                    assert (!removedNodes.contains(node))
-
-                    toInsert += node.getItem
-
-                    node.decrementCount(leafCount)
-
-                    // This node no longer has support, so remove it...
-                    if (node.getCount == 0 && !node.hasChildren)
-                      {
-                        removedNodes += node
-                        removeNodeFromHeaders(node)
-                        node.getParent.removeChild(node)
-                        // Still has support but is unsorted, so we'd better check it out
-                      }
-                    else if (!node.hasChildren && !sortedNodes.contains(node))
-                      {
-                        leavesToInspect += node
-                      }
-
-                    node = node.getParent
-                  }
-              }
-
-              node.decrementCount(leafCount)
-
-              reinsertBranch(toInsert, leafCount, node)
+            else if (nodeOrder < curLowestNodeOrder) {
+              curLowestNodeOrder = nodeOrder
             }
+            assert(!removedNodes.contains(node))
+
+            toInsert.add(node.getItem)
+
+            node.decrementCount(leafCount)
+
+            // This node no longer has support, so remove it...
+            if (node.getCount == 0 && !node.hasChildren) {
+              removedNodes.add(node)
+              removeNodeFromHeaders(node)
+              node.getParent.removeChild(node)
+              // Still has support but is unsorted, so we'd better check it out
+            }
+            else if (!node.hasChildren && !sortedNodes.contains(node)) {
+              leavesToInspect += node
+            }
+
+            node = node.getParent
+          }
         }
+
+        node.decrementCount(leafCount)
+
+        reinsertBranch(toInsert, leafCount, node)
+      }
     }
   }
-
 }
 

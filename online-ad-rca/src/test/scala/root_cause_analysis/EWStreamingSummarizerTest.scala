@@ -388,7 +388,7 @@ class EWStreamingSummarizerTest {
     anomalyDetector.init(anomalySpec)
 
     // Root Cause Analysis Initialization
-    val summarizer = new EWStreamingSummarizer(summarizerSpec, 999)
+    val summarizer = new EWStreamingSummarizer(summarizerSpec, 378)
 
     // Input Stream Initialization
     val dataStream: DataStream[InputRecord] = InputRecordStreamBuilder

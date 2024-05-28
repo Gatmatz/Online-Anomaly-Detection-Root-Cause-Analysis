@@ -40,7 +40,7 @@ class FPTreeNode(item: Int,
    * @param by the count's increment.
    */
   def incrementCount(by: Double): Unit = {
-    count += by
+    count = count + by
   }
 
   /**
@@ -65,7 +65,14 @@ class FPTreeNode(item: Int,
    */
   def removeChild(child: FPTreeNode): Unit = {
     assert(children.contains(child))
-    children = children.filterNot(_ == child)
+    var count: Int = 0
+    var index: Int = -1
+    for (nodeChild <- children) {
+      if (nodeChild == child)
+        index = count
+      count = count + 1
+    }
+    children.remove(index)
   }
 
   /**
@@ -141,8 +148,6 @@ class FPTreeNode(item: Int,
     // O(N^2); slow for large lists; consider optimizing
     for (otherChild <- otherChildren)
     {
-      if (otherChild.getItem == 63)
-        println(otherChild.getItem)
       otherChild.parent = this
       var matched: Boolean = false
       breakable { // Use breakable to be able to break out of the loop
