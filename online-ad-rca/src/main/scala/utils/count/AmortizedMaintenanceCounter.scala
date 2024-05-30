@@ -1,7 +1,8 @@
 package utils.count
 
-import scala.collection.mutable
-
+import java.util
+import java.util.{HashMap, Map}
+import scala.collection.convert.ImplicitConversions.`collection AsScalaIterable`
 /**
  * Maintains probabilistic heavy-hitters:
  * - Item counts are overreported.
@@ -32,13 +33,13 @@ class AmortizedMaintenanceCounter(maxStableSize: Int) extends Serializable
   private var decayFactor: Double = 1
   private val DECAY_RESET_THRESHOLD: Double = Double.MaxValue * .5
 
-  private var counts: mutable.HashMap[Int, Double] = mutable.HashMap.empty[Int, Double]
+  private var counts: util.HashMap[Int, Double] = new util.HashMap[Int, Double]()
 
   private var totalCount: Double = 0
   private var prevEpochMaxEvicted: Double = 0
 
   def multiplyAllCounts(by: Double): Unit = {
-    decayFactor /= by
+    decayFactor = decayFactor / by
 
     if (decayFactor > DECAY_RESET_THRESHOLD)
       {
@@ -47,31 +48,39 @@ class AmortizedMaintenanceCounter(maxStableSize: Int) extends Serializable
 
     if (counts.size > maxStableSize)
       {
-        val a = counts.toList.sortBy(_._2)
+        val entrySet = counts.entrySet()
+        var a : util.ArrayList[util.Map.Entry[Integer, Double]] = new util.ArrayList[util.Map.Entry[Integer, Double]]()
+
+        val entryList: Array[util.Map.Entry[Integer, Double]]= entrySet.toArray(new Array[util.Map.Entry[Integer, Double]](entrySet.size()))
+
+        for (i <- entryList.indices)
+          {
+            a.add(entryList(i))
+          }
 
         val toRemove = counts.size - maxStableSize
 
         var prevEpochMaxEvicted = Double.MinValue
 
         for (i <- 0 until toRemove) {
-          val entry = a(i)
-          counts.remove(entry._1)
-          if (entry._2 > prevEpochMaxEvicted) {
-            prevEpochMaxEvicted = entry._2
+          val entry = a.get(i)
+          counts.remove(entry.getKey)
+          if (entry.getValue > prevEpochMaxEvicted) {
+            prevEpochMaxEvicted = entry.getValue
           }
         }
       }
   }
 
-  def getCounts: mutable.HashMap[Int, Double] = {
+  def getCounts: util.HashMap[Int, Double] = {
     resetDecayFactor()
     counts
   }
 
   private def resetDecayFactor(): Unit = {
-    for ((key, value) <- counts) {
-      val newValue = value / decayFactor
-      counts.put(key, newValue)
+    for (entry <- counts.entrySet) {
+      val newValue: Double = entry.getValue / decayFactor
+      counts.put(entry.getKey, newValue)
     }
 
     totalCount /= decayFactor
@@ -80,20 +89,23 @@ class AmortizedMaintenanceCounter(maxStableSize: Int) extends Serializable
   }
 
   def observe(item: Int, count: Double): Unit = {
-    var var_count = count * decayFactor
+    val var_count = count * decayFactor
 
-    counts.get(item) match {
-      case Some(value) =>
-        val newValue = value + var_count
-        counts.put(item, newValue)
-        totalCount += var_count
-      case None =>
-        val newValue = prevEpochMaxEvicted + var_count
-        counts.put(item, newValue)
-        totalCount += newValue
-    }
+    var value : Double = counts.get(item)
+    if (value == null)
+      {
+        value = prevEpochMaxEvicted + var_count
+        totalCount = totalCount + value
+      }
+    else
+      {
+        value = value + var_count
+        totalCount = totalCount + var_count
+      }
 
-    if (counts(item) > DECAY_RESET_THRESHOLD && decayFactor > 1) {
+    counts.put(item, value)
+
+    if (value > DECAY_RESET_THRESHOLD && decayFactor > 1) {
       resetDecayFactor()
     }
   }
@@ -101,6 +113,7 @@ class AmortizedMaintenanceCounter(maxStableSize: Int) extends Serializable
   def observe(item: Int): Unit = {
     observe(item, 1)
   }
+
   def observe(items: List[Int]): Unit = {
     for (item <- items) {
       observe(item)
@@ -111,9 +124,10 @@ class AmortizedMaintenanceCounter(maxStableSize: Int) extends Serializable
   }
 
   def getCount(item: Int): Double = {
-    counts.get(item) match {
-      case Some(ret) => ret / decayFactor
-      case None => prevEpochMaxEvicted / decayFactor
-    }
+    val ret: Double = counts.get(item)
+    if (ret == null)
+      return prevEpochMaxEvicted / decayFactor
+
+    return ret/decayFactor
   }
 }

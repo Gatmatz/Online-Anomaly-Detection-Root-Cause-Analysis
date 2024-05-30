@@ -1,9 +1,7 @@
 package utils.itemset.FPTree
 
-import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
 import scala.util.control.Breaks.{break, breakable}
-
+import java.util
 /**
  * A class representing a node of a streaming FPTree.
  * @param item the item associated with this node.
@@ -17,7 +15,7 @@ class FPTreeNode(item: Int,
                  treeOfOrigin: StreamingFPTree) extends Serializable {
   private var nextLink: FPTreeNode = _  // Points to the next node with the same item
   private var prevLink: FPTreeNode = _  // Points to the previous node with the same item
-  private var children: ListBuffer[FPTreeNode] = _  // Represents the list of child nodes
+  private var children: util.List[FPTreeNode] = _  // Represents the list of child nodes
 
   /**
    * Getter function for the node's item.
@@ -48,7 +46,7 @@ class FPTreeNode(item: Int,
    * @param by the count's decrement.
    */
   def decrementCount(by: Double): Unit = {
-    count -= by
+    count = count - by
   }
 
   /**
@@ -56,7 +54,7 @@ class FPTreeNode(item: Int,
    * @return true if node has children, otherwise false.
    */
   def hasChildren: Boolean = {
-    children != null && children.nonEmpty
+    children != null && children.size() > 0
   }
 
   /**
@@ -65,14 +63,7 @@ class FPTreeNode(item: Int,
    */
   def removeChild(child: FPTreeNode): Unit = {
     assert(children.contains(child))
-    var count: Int = 0
-    var index: Int = -1
-    for (nodeChild <- children) {
-      if (nodeChild == child)
-        index = count
-      count = count + 1
-    }
-    children.remove(index)
+    children.remove(child)
   }
 
   /**
@@ -119,7 +110,7 @@ class FPTreeNode(item: Int,
    * Method that retrieves the children of the Node.
    * @return a list of FPTreeNodes that are children of the current node.
    */
-  def getChildren: ListBuffer[FPTreeNode] = {
+  def getChildren: util.List[FPTreeNode] = {
     this.children
   }
 
@@ -127,7 +118,7 @@ class FPTreeNode(item: Int,
    * Method that merges the children of the current node with another list of children.
    * @param otherChildren a list of additional FPTreeNodes
    */
-  def mergeChildren(otherChildren: ListBuffer[FPTreeNode]): Unit = {
+  def mergeChildren(otherChildren: util.List[FPTreeNode]): Unit = {
     assert(!hasChildren || !treeOfOrigin.leafNodes.contains(this))
 
     if (otherChildren == null)
@@ -137,36 +128,41 @@ class FPTreeNode(item: Int,
 
     if (children == null)
       {
-        children = otherChildren.map { child =>
+        children = new util.ArrayList[FPTreeNode](otherChildren)
+        for (i <- 0 until otherChildren.size())
+        {
+          val child: FPTreeNode = otherChildren.get(i)
           child.parent = this
-          child
         }
-        treeOfOrigin.leafNodes -= this
-        return
+        treeOfOrigin.leafNodes.remove(this)
       }
 
     // O(N^2); slow for large lists; consider optimizing
-    for (otherChild <- otherChildren)
-    {
+    for (i <- 0 until otherChildren.size()) {
+      val otherChild: FPTreeNode = otherChildren.get(i)
       otherChild.parent = this
       var matched: Boolean = false
-      breakable { // Use breakable to be able to break out of the loop
-        for (ourChild <- children) {
+      breakable {
+        for (j <- 0 until children.size()) {
+          val ourChild: FPTreeNode = children.get(j)
           if (otherChild.getItem == ourChild.getItem) {
             treeOfOrigin.removeNodeFromHeaders(otherChild)
-            ourChild.incrementCount(otherChild.getCount)
+
+            ourChild.count = ourChild.count + otherChild.count
             ourChild.mergeChildren(otherChild.getChildren)
+
             matched = true
-            break  // Break out of the loop
+            break()
           }
         }
       }
 
       if (!matched)
         {
-          this.children ++= otherChildren
+          children.add(otherChild)
         }
     }
+
   }
 
   /**
@@ -178,7 +174,7 @@ class FPTreeNode(item: Int,
    * @param currentIndex the index of the transaction
    */
 
-  def insertTransaction(fullTransaction: List[Int],
+  def insertTransaction(fullTransaction: util.List[Int],
                         itemCount: Double,
                         currentIndex: Int,
                         streaming: Boolean): Unit = {
@@ -194,19 +190,22 @@ class FPTreeNode(item: Int,
         return
       }
 
-    val currentItem: Int = fullTransaction(currentIndex)
+    val currentItem: Int = fullTransaction.get(currentIndex)
 
     var matchingChild: FPTreeNode = null
 
     if (children != null)
       {
         breakable {
-          for (child <- children) {
-            if (child.getItem == currentItem) {
-              matchingChild = child
-              break
+          for (i <- 0 until children.size())
+            {
+              val child: FPTreeNode = children.get(i)
+              if (child.getItem == currentItem)
+                {
+                  matchingChild = child
+                  break()
+                }
             }
-          }
         }
       }
 
@@ -219,7 +218,7 @@ class FPTreeNode(item: Int,
             treeOfOrigin.sortedNodes.add(matchingChild)
           }
 
-        val prevHeader: FPTreeNode = treeOfOrigin.nodeHeaders.getOrElse(currentItem, null)
+        val prevHeader: FPTreeNode = treeOfOrigin.nodeHeaders.get(currentItem)
         treeOfOrigin.nodeHeaders.put(currentItem, matchingChild)
 
         if (prevHeader != null)
@@ -230,17 +229,17 @@ class FPTreeNode(item: Int,
 
         if (children == null)
           {
-            children = ListBuffer.empty[FPTreeNode]
+            children = new util.ArrayList[FPTreeNode]()
           }
 
-        children += matchingChild
+        children.add(matchingChild)
 
         if (currentIndex == (fullTransaction.size - 1))
           {
-            treeOfOrigin.leafNodes += matchingChild
+            treeOfOrigin.leafNodes.add(matchingChild)
           }
 
-        treeOfOrigin.leafNodes -= this
+        treeOfOrigin.leafNodes.remove(this)
       }
 
     matchingChild.insertTransaction(fullTransaction, itemCount, currentIndex + 1, streaming)

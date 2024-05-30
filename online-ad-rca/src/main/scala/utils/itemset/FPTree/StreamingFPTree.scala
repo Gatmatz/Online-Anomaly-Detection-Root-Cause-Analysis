@@ -2,25 +2,26 @@ package utils.itemset.FPTree
 
 import models.ItemsetWithCount
 
-import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
-import scala.language.postfixOps
 import scala.util.control.Breaks.{break, breakable}
+import java.util
+import java.util.stream.Collectors
+import scala.collection.JavaConverters._
+
 
 class StreamingFPTree extends Serializable {
   // Create the root
   val root: FPTreeNode = new FPTreeNode(-1, null, 0, this)
 
-  var frequentItemCounts: mutable.Map[Int, Double] = mutable.Map.empty[Int, Double]
+  var frequentItemCounts: util.Map[Int, Double] = new util.HashMap[Int, Double]()
 
   // Used to calculate the order
-  val frequentItemOrder: mutable.Map[Int, Int] = mutable.Map.empty[Int, Int]
+  val frequentItemOrder: util.Map[Int, Int] = new util.HashMap[Int, Int]()
 
-  var nodeHeaders: mutable.Map[Int, FPTreeNode] = mutable.Map.empty[Int, FPTreeNode]
+  var nodeHeaders: util.Map[Int, FPTreeNode] = new util.HashMap[Int, FPTreeNode]()
 
-  var leafNodes: mutable.HashSet[FPTreeNode] = mutable.HashSet.empty[FPTreeNode]
+  var leafNodes: util.Set[FPTreeNode] = new util.HashSet[FPTreeNode]()
 
-  var sortedNodes: mutable.Set[FPTreeNode] = mutable.Set.empty[FPTreeNode]
+  var sortedNodes: util.Set[FPTreeNode] = new util.HashSet[FPTreeNode]()
 
 
   /** *****************************************************
@@ -32,8 +33,8 @@ class StreamingFPTree extends Serializable {
    */
   private def debugFrequentItemCounts(): Unit = {
     println("Frequent Item Counts:")
-    frequentItemCounts.foreach { case (key, value) =>
-      println(s"$key $value")
+    frequentItemCounts.entrySet().forEach { e =>
+      println(s"${e.getKey} ${e.getValue}")
     }
   }
 
@@ -42,8 +43,8 @@ class StreamingFPTree extends Serializable {
    */
   private def debugFrequentItemOrder(): Unit = {
     println("Frequent Item Order:")
-    frequentItemOrder.foreach { case (key, value) =>
-      println(s"$key $value")
+    frequentItemOrder.entrySet().forEach { e =>
+      println(s"${e.getKey} ${e.getValue}")
     }
   }
 
@@ -68,7 +69,7 @@ class StreamingFPTree extends Serializable {
     println("{} node: {}, count: {}, sorted: {}", indentation, start.getItem, start.getCount, sortedNodes.contains(start))
 
     if (start.getChildren != null) {
-      start.getChildren.foreach { child =>
+      start.getChildren.forEach { child =>
         walkTree(child, treeDepth + 1)
       }
     }
@@ -77,34 +78,38 @@ class StreamingFPTree extends Serializable {
   def decayWeights(start: FPTreeNode,
                    decayWeight: Double): Unit = {
      if (start == root) {
-       for ((item, count) <- frequentItemCounts) {
-         frequentItemCounts.update(item, count * decayWeight)
+       frequentItemCounts.keySet().forEach { item =>
+         frequentItemCounts.put(item, frequentItemCounts.get(item) * decayWeight)
        }
      }
 
       start.count *= decayWeight
       if (start.getChildren != null) {
-        for (child <- start.getChildren) {
-          decayWeights(child, decayWeight)
-        }
+        for (i <-0 until start.getChildren.size())
+          {
+            val child: FPTreeNode = start.getChildren.get(i)
+            decayWeights(child, decayWeight)
+          }
       }
     }
 
-  def getSupport(pattern: List[Int]): Int = {
-    for (i <- pattern) {
-      if (!frequentItemCounts.contains(i))
+  def getSupport(pattern: util.Collection[Int]): Int = {
+    pattern.forEach{ i =>
+      if (!frequentItemCounts.containsKey(i)){
         return 0
+      }
     }
 
-    val plist: List[Int] = pattern
+    val plist: util.List[Int] = new util.ArrayList[Int](pattern)
 
-    plist.sortWith((i1, i2) => frequentItemOrder(i1).compareTo(frequentItemOrder(i2)) < 0)
+    // traverse bottom to top
+    plist.sort((i1: Int, i2: Int) => frequentItemOrder.get(i1).compareTo(frequentItemOrder.get(i2)))
 
     var count: Int = 0
-    var pathHead: FPTreeNode = nodeHeaders(plist.head)
+    var pathHead: FPTreeNode = nodeHeaders.get(plist.get(0))
     while (pathHead != null) {
       var curNode: FPTreeNode = pathHead
-      var itemsToFind: Int = plist.size
+      var itemsToFind: Int = plist.size()
       breakable {
         while (curNode != null) {
           if (pattern.contains(curNode.getItem))
@@ -112,7 +117,7 @@ class StreamingFPTree extends Serializable {
 
           if (itemsToFind == 0) {
             count += pathHead.count.toInt
-            break
+            break()
           }
 
           curNode = curNode.getParent
@@ -123,59 +128,70 @@ class StreamingFPTree extends Serializable {
     count
   }
 
-  def insertFrequentItems(transactions: List[Set[Int]],
+  def insertFrequentItems(transactions: util.List[util.Set[Int]],
                           countRequiredForSupport: Int): Unit = {
     // Find the count of the items and store them in itemCounts HashMap
-    val itemCounts = mutable.HashMap[Int, Double]()
-    for (t <- transactions) {
-      for (item <- t) {
-        itemCounts.update(item, itemCounts.getOrElse(item, 0.0) + 1)
+    val itemCounts: util.Map[Int, Double] = new util.HashMap[Int, Double]()
+    transactions.forEach { t =>
+      t.forEach { item =>
+        itemCounts.compute(item, (k: Int, v: Double) => if (v == null) 1
+        else v + 1)
       }
     }
 
     // Filter out the item that do no reach the minimum support
-    itemCounts.filter {
-        case (_, value) => value >= countRequiredForSupport
-      }
-      .foreach {
-        case (key, value) => frequentItemCounts.put(key, value)
-      }
+    itemCounts.entrySet().forEach { e =>
+      if (e.getValue >= countRequiredForSupport)
+        frequentItemCounts.put(e.getKey, e.getValue)
+    }
 
 
     // We have to materialize a canonical order so that items with equal counts
     // are consistently ordered when they are sorted during transaction insertion
-    var sortedItemCounts = frequentItemCounts.toList
-    sortedItemCounts = sortedItemCounts.sortBy(entry => (frequentItemCounts(entry._1), entry._1))
+    val entrySet = frequentItemCounts.entrySet()
+    val sortedItemCounts: util.ArrayList[util.Map.Entry[Int, Double]] = new util.ArrayList[util.Map.Entry[Int, Double]](entrySet)
+    sortedItemCounts.sort((entry1: util.Map.Entry[Int, Double], entry2: util.Map.Entry[Int, Double]) => {
+      val compareByValue: Int = entry1.getValue.compareTo(entry2.getValue)
+      if (compareByValue == 0) {
+        // If values are equal, sort by key
+        entry1.getKey.compareTo(entry2.getKey)
+      }
+      else {
+        // Otherwise, sort by value
+        compareByValue
+      }
 
-    // Populate the frequentItemOrder map
-    sortedItemCounts.zipWithIndex.foreach { case ((key, _), index) =>
-      frequentItemOrder(key) = index
-    }
+    })
+
+    for (i <-0 until sortedItemCounts.size())
+      {
+        frequentItemOrder.put(sortedItemCounts.get(i).getKey, i)
+      }
   }
 
-  def deleteItems(itemsToDelete: Set[Int]): Unit = {
+  def deleteItems(itemsToDelete: util.Set[Int]): Unit = {
     if (itemsToDelete == null)
       {
         return
       }
 
-    for (item <- itemsToDelete) {
-      frequentItemCounts.remove(item)
+    itemsToDelete.forEach { item =>
       frequentItemOrder.remove(item)
 
-      var nodeToDelete = nodeHeaders.getOrElse(item, null)
+      var nodeToDelete: FPTreeNode = nodeHeaders.get(item)
 
-      while(nodeToDelete != null) {
-        nodeToDelete.parent.removeChild(nodeToDelete)
-        if (nodeToDelete.hasChildren)
+      while (nodeToDelete != null)
         {
-          nodeToDelete.parent.mergeChildren(nodeToDelete.getChildren)
-        }
-        leafNodes.remove(nodeToDelete)
-        nodeToDelete = nodeToDelete.getNextLink
-        }
+          nodeToDelete.parent.removeChild(nodeToDelete)
+          if (nodeToDelete.hasChildren)
+            {
+              nodeToDelete.parent.mergeChildren(nodeToDelete.getChildren)
+            }
 
-      nodeHeaders.remove(item)
+          leafNodes.remove(nodeToDelete)
+
+          nodeToDelete = nodeToDelete.getNextLink
+        }
     }
   }
 
@@ -186,98 +202,110 @@ class StreamingFPTree extends Serializable {
 
     // We have to materialize a canonical order so that items with equal counts
     // are consistently ordered when they are sorted during transaction insertion
-    var sortedItemCounts = frequentItemCounts.toList
-    sortedItemCounts = sortedItemCounts.sortBy{ case (id, value) => (value, id) }
+    val entrySet = frequentItemCounts.entrySet()
+    val sortedItemCounts: util.ArrayList[util.Map.Entry[Int, Double]] = new util.ArrayList[util.Map.Entry[Int, Double]](entrySet)
+    sortedItemCounts.sort((i1: util.Map.Entry[Int, Double], i2: util.Map.Entry[Int, Double]) => frequentItemCounts.get(i1.getKey).compareTo(frequentItemCounts.get(i2.getKey)))
 
     // Populate the frequentItemOrder map
     for (i <- 0 until sortedItemCounts.size)
     {
-      frequentItemOrder.put(sortedItemCounts(i)._1, i)
+      frequentItemOrder.put(sortedItemCounts.get(i).getKey, i)
     }
   }
 
-  def insertConditionalFrequentItems(patterns:List[ItemsetWithCount],
+  def insertConditionalFrequentItems(patterns:util.List[ItemsetWithCount],
                                      countRequiredForSupport: Int): Unit = {
-    val itemCounts: mutable.HashMap[Int, Double] = mutable.HashMap.empty[Int, Double]
+    val itemCounts: util.Map[Int, Double] = new util.HashMap[Int, Double]()
 
-    for (i <- patterns) {
-      for (item <- i.getItems) {
-        itemCounts.update(item, itemCounts.getOrElse(item, 0.0) + i.getCount)
+    patterns.forEach { i =>
+      i.getItems.forEach { item =>
+        itemCounts.compute(item, (k: Int, v: Double) => if (v == null) i.getCount
+        else v + i.getCount)
       }
     }
 
-    for ((key, value) <- itemCounts) {
-      if (value >= countRequiredForSupport)
-        frequentItemCounts.put(key, value)
+    itemCounts.entrySet().forEach { e =>
+      if (e.getValue >= countRequiredForSupport)
+        frequentItemCounts.put(e.getKey, e.getValue)
     }
 
     updateFrequentItemOrder()
   }
 
-  def sortTransaction(txn: List[Int], isStreaming: Boolean): List[Int] = {
+  def sortTransaction(txn: util.List[Int], isStreaming: Boolean): util.List[Int] = {
     if (!isStreaming) {
-      txn.sortBy(i => (-1) * frequentItemOrder.getOrElse(i, Int.MinValue))
+      txn.sort((i1: Int, i2: Int) => frequentItemOrder.get(i2).compareTo(frequentItemOrder.get(i1)))
     } else {
-      txn.sortBy(i => (-1) * frequentItemOrder.getOrElse(i, -i))
+      txn.sort((i1: Int, i2: Int) => frequentItemOrder.compute(i2, (k: Int, v: Int) => if (v == null) -i2
+      else v).compareTo(frequentItemOrder.compute(i1, (k: Int, v: Int) => if (v == null) -i1
+      else v)))
     }
+    txn
   }
 
-  def reinsertBranch(pattern: mutable.Set[Int],
+  def reinsertBranch(pattern: util.Set[Int],
                      count: Double,
                      rootOfBranch: FPTreeNode): Unit = {
-    val filtered: List[Int] = pattern.filter(frequentItemCounts.contains).toList
+    val filtered = pattern
+      .stream
+      .filter((i: Int) => frequentItemCounts.containsKey(i))
+      .collect(Collectors.toList[Int])
+
     sortTransaction(filtered, isStreaming = false)
     rootOfBranch.insertTransaction(filtered, count, 0, streaming = false)
   }
 
-  def insertConditionalFrequentPatterns(patterns: List[ItemsetWithCount]): Unit = {
-    for (is <- patterns) {
+  def insertConditionalFrequentPatterns(patterns: util.List[ItemsetWithCount]): Unit = {
+    patterns.forEach { is =>
       reinsertBranch(is.getItems, is.getCount, root)
     }
   }
 
-  def insertTransactions(transactions: List[Set[Int]],
+  def insertTransactions(transactions: util.List[util.Set[Int]],
                          streaming: Boolean,
                          filterExistingFrequentItemsOnly: Boolean): Unit = {
-    for (transaction <- transactions) {
+    transactions.forEach { transaction =>
       insertTransaction(transaction, streaming, filterExistingFrequentItemsOnly)
     }
   }
 
-  def insertTransaction(transaction: Set[Int],
+  def insertTransaction(transaction: util.Set[Int],
                         streaming: Boolean,
                         filterExistingFrequentItemsOnly: Boolean): Unit = {
     if (streaming && !filterExistingFrequentItemsOnly)
       {
-        for (item <- transaction) {
-          frequentItemCounts.update(item, frequentItemCounts.getOrElse(item, 0.0) + 1)
+        transaction.forEach { item =>
+          frequentItemCounts.compute(item, (k: Int, v: Double) => if (v == null) 1
+          else v + 1)
         }
       }
 
-    var filtered: List[Int] = transaction
-      .filter(p => frequentItemCounts.contains(p))
-      .toList
+    val filtered: util.List[Int] = transaction
+      .stream
+      .filter((i: Int) => frequentItemCounts.containsKey(i))
+      .collect(Collectors.toList[Int])
 
-    if (filtered.nonEmpty)
+    if (!filtered.isEmpty)
       {
         if (streaming && filterExistingFrequentItemsOnly)
           {
-            for (item <- filtered) {
-              frequentItemCounts.update(item, frequentItemCounts.getOrElse(item, 0.0) + 1)
+            filtered.forEach { item =>
+              frequentItemCounts.compute(item, (k: Int, v: Double) => if (v == null) 1
+              else v + 1)
             }
           }
 
-        filtered = sortTransaction(filtered, streaming)
+        sortTransaction(filtered, streaming)
         root.insertTransaction(filtered, 1, 0, streaming)
       }
   }
 
   def removeNodeFromHeaders(node:FPTreeNode): Unit = {
-    leafNodes -= node
+    leafNodes.remove(node)
 
     if (node.getPrevLink == null)
       {
-        assert(nodeHeaders.getOrElse(node.getItem, null) == node)
+        assert(nodeHeaders.get(node.getItem) == node)
         nodeHeaders.put(node.getItem, node.getNextLink)
       }
     else
@@ -289,14 +317,14 @@ class StreamingFPTree extends Serializable {
       node.getNextLink.setPrevLink(node.getPrevLink)
   }
 
-  def mineItemsets(supportCountRequired: Int): List[ItemsetWithCount] = {
-    val singlePathItemsets: ListBuffer[ItemsetWithCount] = ListBuffer.empty[ItemsetWithCount]
-    val branchingItemsets: ListBuffer[ItemsetWithCount] = ListBuffer.empty[ItemsetWithCount]
+  def mineItemsets(supportCountRequired: Int): util.List[ItemsetWithCount] = {
+    val singlePathItemsets: util.List[ItemsetWithCount] = new util.ArrayList[ItemsetWithCount]()
+    val branchingItemsets: util.List[ItemsetWithCount] = new util.ArrayList[ItemsetWithCount]()
 
     // Mine single-path itemsets first
     var curNode: FPTreeNode = root
     var nodeOfBranching: FPTreeNode = null
-    var singlePathNodes: Set[FPTreeNode] = Set.empty[FPTreeNode]
+    val singlePathNodes: util.Set[FPTreeNode] = new util.HashSet[FPTreeNode]()
 
     breakable
     {
@@ -312,36 +340,38 @@ class StreamingFPTree extends Serializable {
             }
 
           if (curNode != root)
-              singlePathNodes += curNode
+              singlePathNodes.add(curNode)
 
-          if (curNode.getChildren == null || curNode.getChildren.isEmpty)
+          if (curNode.getChildren == null || curNode.getChildren.size == 0)
             break()
           else
-            curNode = curNode.getChildren.head
+            curNode = curNode.getChildren.get(0)
         }
     }
-    for (subset <- singlePathNodes.subsets()) {
-      if (subset.isEmpty) {
+    val singlePathNodesScala: Set[FPTreeNode] = singlePathNodes.asScala.toSet
+    for (subset <- singlePathNodesScala.subsets()) {
+      breakable {
+        if (subset.isEmpty)
+          break
 
-      }
-      else {
-        var minSupportInSubset: Double = -1.0
-        val items = mutable.Set[Int]()
-
-        for (n <- subset) {
+        var minSupportInSubset: Double = -1
+        val items: util.Set[Int] = new util.HashSet[Int]()
+        subset.foreach { n =>
           items.add(n.getItem)
 
           if (minSupportInSubset == -1 || n.getCount < minSupportInSubset)
             minSupportInSubset = n.getCount
         }
+
         assert(minSupportInSubset >= supportCountRequired)
-        singlePathItemsets += new ItemsetWithCount(items, minSupportInSubset)
+
+        singlePathItemsets.add(new ItemsetWithCount(items, minSupportInSubset))
       }
     }
 
     // the entire tree was a single path
     if (nodeOfBranching == null)
-      return singlePathItemsets.toList
+      return singlePathItemsets
 
     // all of the items in the single path will have been mined now
     // due to the descending frequency count of the StreamingFPTree structure, so
@@ -349,153 +379,154 @@ class StreamingFPTree extends Serializable {
     // instead of destructively removing the nodes from NodeHeader table
     // which would be valid but would make mining non-idempotent, we
     // instead store the nodes to skip in a separate set
-    val alreadyMinedItems = mutable.HashSet[Int]()
-    for (node <- singlePathNodes) {
+    val alreadyMinedItems = new util.HashSet[Int]()
+    singlePathNodes.forEach { node =>
       alreadyMinedItems.add(node.getItem)
     }
 
-    for (key <- nodeHeaders) {
-      if (alreadyMinedItems.contains(key._1) || frequentItemCounts.getOrElse(key._1, -1.0) < supportCountRequired) {
+    nodeHeaders.entrySet().forEach { header =>
+      breakable {
+        if (alreadyMinedItems.contains(header.getKey) || (frequentItemCounts.get(header.getKey) < supportCountRequired))
+          break()
 
-      }
-      else {
-        // Add the singleton item set
-        branchingItemsets += new ItemsetWithCount(mutable.Set(key._1), frequentItemCounts(key._1))
+        // add the singleton item set
+        branchingItemsets.add(new ItemsetWithCount(new util.HashSet[Int](header.getKey),frequentItemCounts.get(header.getKey)))
 
-        val conditionalPatternBase = mutable.ListBuffer.empty[ItemsetWithCount]
+        val conditionalPatternBase: util.List[ItemsetWithCount] = new util.ArrayList[ItemsetWithCount]()
 
-        // Walk each "leaf" node
-        var conditionalNode = key._2
-        while (conditionalNode != null) {
-          val leafSupport = conditionalNode.getCount
+        // walk each "leaf" node
+        var conditionalNode: FPTreeNode = header.getValue
+        while (conditionalNode != null)
+          {
+            val leafSupport: Double = conditionalNode.getCount
 
-          // Walk the tree up to the branch node
-          val conditionalPattern = mutable.Set.empty[Int]
-          var walkNode = conditionalNode.getParent
-          while (walkNode != nodeOfBranching.getParent && walkNode != root) {
-            conditionalPattern.add(walkNode.getItem)
-            walkNode = walkNode.getParent
+            // walk the tree up to the branch node
+            val conditionalPattern: util.Set[Int] = new util.HashSet[Int]()
+            var walkNode: FPTreeNode = conditionalNode.getParent
+            while (walkNode != nodeOfBranching.getParent && walkNode != root)
+              {
+                conditionalPattern.add(walkNode.getItem)
+                walkNode = walkNode.getParent
+              }
+
+            if (conditionalPattern.size() > 0)
+              conditionalPatternBase.add(new ItemsetWithCount(conditionalPattern, leafSupport))
+
+            conditionalNode = conditionalNode.getNextLink
           }
 
-          if (conditionalPattern.nonEmpty) {
-            conditionalPatternBase += new ItemsetWithCount(conditionalPattern, leafSupport)
-          }
+        if (conditionalPatternBase.isEmpty)
+          break()
 
-          conditionalNode = conditionalNode.getNextLink
-        }
+        // build and mine the conditional StreamingFPTree
+        val conditionalTree: StreamingFPTree = new StreamingFPTree
+        conditionalTree.insertConditionalFrequentItems(conditionalPatternBase,supportCountRequired)
+        conditionalTree.insertConditionalFrequentPatterns(conditionalPatternBase)
+        val conditionalFrequentItemsets: util.List[ItemsetWithCount] = conditionalTree.mineItemsets(supportCountRequired)
 
-        if (conditionalPatternBase.isEmpty) {
-
-        }
-        else {
-          // Build and mine the conditional StreamingFPTree
-          val conditionalTree = new StreamingFPTree()
-          conditionalTree.insertConditionalFrequentItems(conditionalPatternBase.toList, supportCountRequired)
-          conditionalTree.insertConditionalFrequentPatterns(conditionalPatternBase.toList)
-          val conditionalFrequentItemsets = conditionalTree.mineItemsets(supportCountRequired)
-
-          if (conditionalFrequentItemsets.nonEmpty)
-            for (is <- conditionalFrequentItemsets) {
-              is.getItems += key._1
+        if (!conditionalFrequentItemsets.isEmpty)
+          {
+            conditionalFrequentItemsets.forEach { is =>
+              is.getItems.add(header.getKey)
             }
 
-          branchingItemsets ++= conditionalFrequentItemsets
-        }
+            branchingItemsets.addAll(conditionalFrequentItemsets)
+          }
       }
     }
 
     if (singlePathItemsets.isEmpty) {
-      return branchingItemsets.toList
+      return branchingItemsets
     }
 
     // Take the cross product of the mined itemsets
-    val ret = ListBuffer[ItemsetWithCount]()
+    val ret: util.List[ItemsetWithCount] = new util.ArrayList[ItemsetWithCount]()
 
-    ret ++= singlePathItemsets
-    ret ++= branchingItemsets
+    ret.addAll(singlePathItemsets)
+    ret.addAll(branchingItemsets)
 
-    for (i <- singlePathItemsets) {
-      for (j <- branchingItemsets) {
-        val combinedItem = mutable.HashSet[Int]()
-        combinedItem ++= i.getItems
-        combinedItem ++= j.getItems
-        ret += new ItemsetWithCount(combinedItem, Math.min(i.getCount, j.getCount))
+    singlePathItemsets.forEach { i =>
+      branchingItemsets.forEach { j =>
+        val combinedItems = new util.HashSet[Int]()
+        combinedItems.addAll(i.getItems)
+        combinedItems.addAll(j.getItems)
+        ret.add(new ItemsetWithCount(combinedItems, Math.min(i.getCount, j.getCount)))
       }
     }
-    ret.toList
+    ret
   }
 
   def sortByNewOrder(): Unit = {
     // We need to walk the tree from each leaf to each root
-    val leavesToInspect = new ListBuffer[FPTreeNode]()
-    leavesToInspect ++= leafNodes.toList
-    val removedNodes = mutable.HashSet[FPTreeNode]()
-    for (leaf <- leavesToInspect) {
-      breakable {
-        if (leaf == root)
-          break
+    val leavesToInspect = new util.ArrayList[FPTreeNode](leafNodes)
+    val removedNodes = new util.HashSet[FPTreeNode]()
+    for (i <- 0 until leavesToInspect.size)
+      {
+        val leaf: FPTreeNode = leavesToInspect.get(i)
+        breakable
+        {
+          if (leaf == root)
+            break
 
-        if (removedNodes.contains(leaf) || sortedNodes.contains(leaf))
-          break
+          if (removedNodes.contains(leaf) || sortedNodes.contains(leaf))
+            break
 
-        val leafCount: Double = leaf.count
-        val toInsert = mutable.HashSet[Int]()
+          val leafCount: Double = leaf.getCount
 
-        toInsert.add(leaf.getItem)
-        assert(!leaf.hasChildren)
+          val toInsert: util.Set[Int] = new util.HashSet[Int]()
 
-        removeNodeFromHeaders(leaf)
+          toInsert.add(leaf.getItem)
 
-        removedNodes.add(leaf)
+          assert(!leaf.hasChildren)
 
-        var curLowestNodeOrder: Int = frequentItemOrder.getOrElse(leaf.getItem, -1)
+          removeNodeFromHeaders(leaf)
 
-        assert(curLowestNodeOrder != -1)
+          removedNodes.add(leaf)
 
-        var node: FPTreeNode = leaf.getParent
-        node.removeChild(leaf)
+          var curLowestNodeOrder: Int = frequentItemOrder.get(leaf.getItem)
 
-        breakable {
-          while (true) {
-            if (node == root)
-              break
+          var node: FPTreeNode = leaf.getParent
+          node.removeChild(leaf)
 
-            val nodeOrder: Int = frequentItemOrder.getOrElse(node.getItem, -1)
+          breakable {
+            while(true)
+              {
+                if (node == root)
+                  break()
 
-            assert(nodeOrder != -1)
+                val nodeOrder: Int = frequentItemOrder.get(node.getItem)
+                if (sortedNodes.contains(node) && nodeOrder < curLowestNodeOrder)
+                  break()
+                else if (nodeOrder < curLowestNodeOrder)
+                  {
+                    curLowestNodeOrder = nodeOrder
+                  }
 
-            if (sortedNodes.contains(node) && nodeOrder < curLowestNodeOrder) {
-              break
-            }
-            else if (nodeOrder < curLowestNodeOrder) {
-              curLowestNodeOrder = nodeOrder
-            }
-            assert(!removedNodes.contains(node))
+                assert(!removedNodes.contains(node))
 
-            toInsert.add(node.getItem)
+                toInsert.add(node.getItem)
 
-            node.decrementCount(leafCount)
+                node.decrementCount(leafCount)
 
-            // This node no longer has support, so remove it...
-            if (node.getCount == 0 && !node.hasChildren) {
-              removedNodes.add(node)
-              removeNodeFromHeaders(node)
-              node.getParent.removeChild(node)
-              // Still has support but is unsorted, so we'd better check it out
-            }
-            else if (!node.hasChildren && !sortedNodes.contains(node)) {
-              leavesToInspect += node
-            }
+                if (node.getCount == 0 && !node.hasChildren)
+                  {
+                    removedNodes.add(node)
+                    removeNodeFromHeaders(node)
+                    node.getParent.removeChild(node)
+                  }
+                else if (!node.hasChildren && !sortedNodes.contains(node))
+                  leavesToInspect.add(node)
 
-            node = node.getParent
+                node = node.getParent
+              }
+
           }
+
+          node.decrementCount(leafCount)
+
+          reinsertBranch(toInsert, leafCount, node)
         }
-
-        node.decrementCount(leafCount)
-
-        reinsertBranch(toInsert, leafCount, node)
       }
-    }
   }
 }
 

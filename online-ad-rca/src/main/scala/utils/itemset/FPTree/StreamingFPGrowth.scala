@@ -2,8 +2,9 @@ package utils.itemset.FPTree
 
 import models.ItemsetWithCount
 
+import java.util
+import scala.collection.JavaConverters._
 import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
 
 /**
  * Driver class for FPGrowth algorithm on a streaming environment.
@@ -16,19 +17,19 @@ class StreamingFPGrowth(support: Double) extends Serializable {
   var startedStreaming: Boolean = false
 
 
-  def insertTransactionsStreamingExact(transactions: List[Set[Int]]): Unit = {
+  def insertTransactionsStreamingExact(transactions: util.List[util.Set[Int]]): Unit = {
     needsRestructure = true
 
     fp.insertTransactions(transactions, streaming = true, filterExistingFrequentItemsOnly = false)
   }
 
-  def insertTransactionFalseNegative(transaction: Set[Int]): Unit = {
+  def insertTransactionFalseNegative(transaction: util.Set[Int]): Unit = {
     needsRestructure = true
 
     fp.insertTransaction(transaction, streaming = true, filterExistingFrequentItemsOnly = true)
   }
 
-  def restructureTree(itemsToDelete: Set[Int]): Unit = {
+  def restructureTree(itemsToDelete: util.Set[Int]): Unit = {
     needsRestructure = false
 
     fp.deleteItems(itemsToDelete)
@@ -36,7 +37,7 @@ class StreamingFPGrowth(support: Double) extends Serializable {
     fp.sortByNewOrder()
   }
 
-  def buildTree(transactions: List[Set[Int]]): Unit = {
+  def buildTree(transactions: util.List[util.Set[Int]]): Unit = {
     if (startedStreaming)
     {
       throw new Exception("Can't build a tree based on an already streaming tree..")
@@ -48,32 +49,32 @@ class StreamingFPGrowth(support: Double) extends Serializable {
     fp.insertTransactions(transactions, streaming = false, filterExistingFrequentItemsOnly = false)
   }
 
-  def decayAndResetFrequentItems(newFrequentItems: mutable.Map[Int, Double],
+  def decayAndResetFrequentItems(newFrequentItems: util.Map[Int, Double],
                                  decayRate: Double): Unit = {
-    val toRemove: Set[Int] = fp.frequentItemOrder.keySet.diff(newFrequentItems.keySet).toSet
+    val frequentItemOrderScala: mutable.Set[Int] = fp.frequentItemOrder.keySet.asScala
+    val newFrequentItemsScala = newFrequentItems.keySet.asScala
+    val toRemove: Set[Int] = frequentItemOrderScala.diff(newFrequentItemsScala).toSet
     fp.frequentItemCounts = newFrequentItems
     fp.updateFrequentItemOrder()
     if (decayRate > 0) {
       fp.decayWeights(fp.root, 1 - decayRate)
     }
-    restructureTree(toRemove)
+    restructureTree(toRemove.asJava)
   }
 
-  def getCounts(targets: List[ItemsetWithCount]): List[ItemsetWithCount] = {
+  def getCounts(targets: util.List[ItemsetWithCount]): util.List[ItemsetWithCount] = {
     if (needsRestructure)
       {
         restructureTree(null)
       }
-
-    val ret = ListBuffer[ItemsetWithCount]()
-    for (target <- targets) {
-      val count = fp.getSupport(target.getItems.toList)
-      ret += new ItemsetWithCount(target.getItems, count)
+    val ret: util.ArrayList[ItemsetWithCount] = new util.ArrayList[ItemsetWithCount]()
+    targets.forEach { target =>
+      ret.add(new ItemsetWithCount(target.getItems, fp.getSupport(target.getItems)))
     }
-    ret.toList
+    ret
   }
 
-  def getItemsets: List[ItemsetWithCount] = {
+  def getItemsets: util.List[ItemsetWithCount] = {
     if (needsRestructure)
       {
         restructureTree(null)

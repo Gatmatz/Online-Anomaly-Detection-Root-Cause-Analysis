@@ -3,6 +3,7 @@ package utils.count
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
+import scala.collection.convert.ImplicitConversions.`map AsScala`
 import scala.collection.mutable
 import scala.util.Random
 

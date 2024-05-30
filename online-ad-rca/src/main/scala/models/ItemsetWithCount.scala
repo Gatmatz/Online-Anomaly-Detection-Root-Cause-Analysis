@@ -1,10 +1,10 @@
 package models
 
-import scala.collection.mutable
+import java.util
 
-class ItemsetWithCount(private val items: mutable.Set[Int],
+class ItemsetWithCount(private val items: util.Set[Int],
                        private val count: Double) extends Serializable {
-  def getItems: mutable.Set[Int] = items
+  def getItems: util.Set[Int] = items
 
   def getCount: Double = count
 }
