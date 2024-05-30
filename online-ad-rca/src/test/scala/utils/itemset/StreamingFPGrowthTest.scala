@@ -8,7 +8,6 @@ import utils.itemset.FPTree.StreamingFPGrowth
 import java.util
 import java.util.Random
 import scala.collection.JavaConverters._
-import scala.collection.mutable
 class StreamingFPGrowthTest {
 
   private def intIfy(txnStr: String): util.Set[Int] = {

@@ -232,15 +232,16 @@ class StreamingFPTree extends Serializable {
     updateFrequentItemOrder()
   }
 
-  def sortTransaction(txn: util.List[Int], isStreaming: Boolean): util.List[Int] = {
+  def sortTransaction(txn: util.List[Int], isStreaming: Boolean): Unit = {
     if (!isStreaming) {
       txn.sort((i1: Int, i2: Int) => frequentItemOrder.get(i2).compareTo(frequentItemOrder.get(i1)))
     } else {
-      txn.sort((i1: Int, i2: Int) => frequentItemOrder.compute(i2, (k: Int, v: Int) => if (v == null) -i2
-      else v).compareTo(frequentItemOrder.compute(i1, (k: Int, v: Int) => if (v == null) -i1
-      else v)))
+      txn.sort((i1, i2) => {
+        val v1 = frequentItemOrder.computeIfAbsent(i1, k => -1 * k)
+        val v2 = frequentItemOrder.computeIfAbsent(i2, k => -1 * k)
+        v2.compareTo(v1)
+      })
     }
-    txn
   }
 
   def reinsertBranch(pattern: util.Set[Int],
@@ -350,23 +351,24 @@ class StreamingFPTree extends Serializable {
     }
     val singlePathNodesScala: Set[FPTreeNode] = singlePathNodes.asScala.toSet
     for (subset <- singlePathNodesScala.subsets()) {
-      breakable {
-        if (subset.isEmpty)
-          break
+      if (subset.isEmpty)
+        {
 
-        var minSupportInSubset: Double = -1
-        val items: util.Set[Int] = new util.HashSet[Int]()
-        subset.foreach { n =>
-          items.add(n.getItem)
-
-          if (minSupportInSubset == -1 || n.getCount < minSupportInSubset)
-            minSupportInSubset = n.getCount
         }
+      else
+        {
+          var minSupportInSubset: Double = -1
+          val items: util.Set[Int] = new util.HashSet[Int]()
+          subset.foreach { n =>
+            items.add(n.getItem)
 
-        assert(minSupportInSubset >= supportCountRequired)
+            if (minSupportInSubset == -1 || n.getCount < minSupportInSubset)
+              minSupportInSubset = n.getCount
+          }
 
-        singlePathItemsets.add(new ItemsetWithCount(items, minSupportInSubset))
-      }
+          assert(minSupportInSubset >= supportCountRequired)
+          singlePathItemsets.add(new ItemsetWithCount(items, minSupportInSubset))
+        }
     }
 
     // the entire tree was a single path
@@ -390,7 +392,9 @@ class StreamingFPTree extends Serializable {
           break()
 
         // add the singleton item set
-        branchingItemsets.add(new ItemsetWithCount(new util.HashSet[Int](header.getKey),frequentItemCounts.get(header.getKey)))
+        val hashSet = new util.HashSet[Int]()
+        hashSet.add(header.getKey)
+        branchingItemsets.add(new ItemsetWithCount(hashSet, frequentItemCounts.get(header.getKey)))
 
         val conditionalPatternBase: util.List[ItemsetWithCount] = new util.ArrayList[ItemsetWithCount]()
 
@@ -463,68 +467,74 @@ class StreamingFPTree extends Serializable {
     for (i <- 0 until leavesToInspect.size)
       {
         val leaf: FPTreeNode = leavesToInspect.get(i)
-        breakable
-        {
-          if (leaf == root)
-            break
+        if (leaf == root)
+          {
 
+          }
+        else {
           if (removedNodes.contains(leaf) || sortedNodes.contains(leaf))
-            break
+            {
 
-          val leafCount: Double = leaf.getCount
+            }
+          else
+            {
+              val leafCount = leaf.getCount
 
-          val toInsert: util.Set[Int] = new util.HashSet[Int]()
+              val toInsert: util.Set[Int] = new util.HashSet[Int]()
 
-          toInsert.add(leaf.getItem)
+              toInsert.add(leaf.getItem)
 
-          assert(!leaf.hasChildren)
+              assert(!leaf.hasChildren)
 
-          removeNodeFromHeaders(leaf)
+              removeNodeFromHeaders(leaf)
 
-          removedNodes.add(leaf)
+              removedNodes.add(leaf)
 
-          var curLowestNodeOrder: Int = frequentItemOrder.get(leaf.getItem)
+              var curLowestNodeOrder: Int = frequentItemOrder.get(leaf.getItem)
 
-          var node: FPTreeNode = leaf.getParent
-          node.removeChild(leaf)
+              var node: FPTreeNode = leaf.getParent
+              node.removeChild(leaf)
 
-          breakable {
-            while(true)
-              {
-                if (node == root)
-                  break()
+              breakable {
+                while(true)
+                {
+                  if (node == root)
+                    break()
 
-                val nodeOrder: Int = frequentItemOrder.get(node.getItem)
-                if (sortedNodes.contains(node) && nodeOrder < curLowestNodeOrder)
-                  break()
-                else if (nodeOrder < curLowestNodeOrder)
+                  val nodeOrder = frequentItemOrder.get(node.getItem)
+                  if (sortedNodes.contains(node) && nodeOrder < curLowestNodeOrder)
+                    {
+                      break()
+                    }
+                  else if (nodeOrder < curLowestNodeOrder)
                   {
                     curLowestNodeOrder = nodeOrder
                   }
 
-                assert(!removedNodes.contains(node))
+                  assert(!removedNodes.contains(node))
 
-                toInsert.add(node.getItem)
+                  toInsert.add(node.getItem)
 
-                node.decrementCount(leafCount)
+                  node.decrementCount(leafCount)
 
-                if (node.getCount == 0 && !node.hasChildren)
+                  if (node.getCount == 0 && !node.hasChildren)
                   {
                     removedNodes.add(node)
                     removeNodeFromHeaders(node)
                     node.getParent.removeChild(node)
                   }
-                else if (!node.hasChildren && !sortedNodes.contains(node))
-                  leavesToInspect.add(node)
+                  else if (!node.hasChildren && !sortedNodes.contains(node))
+                    leavesToInspect.add(node)
 
-                node = node.getParent
+                  node = node.getParent
+                }
+
               }
 
-          }
+              node.decrementCount(leafCount)
 
-          node.decrementCount(leafCount)
-
-          reinsertBranch(toInsert, leafCount, node)
+              reinsertBranch(toInsert, leafCount, node)
+            }
         }
       }
   }
