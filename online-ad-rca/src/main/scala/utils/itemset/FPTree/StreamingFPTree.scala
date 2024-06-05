@@ -169,29 +169,28 @@ class StreamingFPTree extends Serializable {
       }
   }
 
-  def deleteItems(itemsToDelete: util.Set[Int]): Unit = {
-    if (itemsToDelete == null)
-      {
-        return
-      }
+  def deleteItems(itemsToDelete: java.util.Set[Int]): Unit = {
+    if (itemsToDelete == null) {
+      return
+    }
 
-    itemsToDelete.forEach { item =>
+    for (item <- itemsToDelete.asScala) {
       frequentItemOrder.remove(item)
 
-      var nodeToDelete: FPTreeNode = nodeHeaders.get(item)
+      var nodeToDelete = nodeHeaders.get(item)
 
-      while (nodeToDelete != null)
-        {
-          nodeToDelete.parent.removeChild(nodeToDelete)
-          if (nodeToDelete.hasChildren)
-            {
-              nodeToDelete.parent.mergeChildren(nodeToDelete.getChildren)
-            }
-
-          leafNodes.remove(nodeToDelete)
-
-          nodeToDelete = nodeToDelete.getNextLink
+      while (nodeToDelete != null) {
+        nodeToDelete.parent.removeChild(nodeToDelete)
+        if (nodeToDelete.hasChildren) {
+          nodeToDelete.parent.mergeChildren(nodeToDelete.getChildren)
         }
+
+        leafNodes.remove(nodeToDelete)
+
+        nodeToDelete = nodeToDelete.getNextLink
+      }
+
+      nodeHeaders.remove(item)
     }
   }
 
@@ -460,83 +459,143 @@ class StreamingFPTree extends Serializable {
     ret
   }
 
-  def sortByNewOrder(): Unit = {
-    // We need to walk the tree from each leaf to each root
-    val leavesToInspect = new util.ArrayList[FPTreeNode](leafNodes)
-    val removedNodes = new util.HashSet[FPTreeNode]()
-    for (i <- 0 until leavesToInspect.size)
-      {
+//  def sortByNewOrder(): Unit = {
+//    // We need to walk the tree from each leaf to each root
+//    val leavesToInspect = new util.ArrayList[FPTreeNode](leafNodes)
+//    val removedNodes = new util.HashSet[FPTreeNode]()
+//    for (i <- 0 until leavesToInspect.size)
+//      {
+//        val leaf: FPTreeNode = leavesToInspect.get(i)
+//        if (leaf == root)
+//          {
+//
+//          }
+//        else {
+//          if (removedNodes.contains(leaf) || sortedNodes.contains(leaf))
+//            {
+//
+//            }
+//          else
+//            {
+//              val leafCount = leaf.getCount
+//
+//              val toInsert: util.Set[Int] = new util.HashSet[Int]()
+//
+//              toInsert.add(leaf.getItem)
+//
+//              assert(!leaf.hasChildren)
+//
+//              removeNodeFromHeaders(leaf)
+//
+//              removedNodes.add(leaf)
+//
+//              var curLowestNodeOrder: Int = frequentItemOrder.get(leaf.getItem)
+//
+//              var node: FPTreeNode = leaf.getParent
+//              node.removeChild(leaf)
+//
+//              breakable {
+//                while(true)
+//                {
+//                  if (node == root)
+//                    break()
+//
+//                  val nodeOrder = frequentItemOrder.get(node.getItem)
+//                  if (sortedNodes.contains(node) && nodeOrder < curLowestNodeOrder)
+//                    {
+//                      break()
+//                    }
+//                  else if (nodeOrder < curLowestNodeOrder)
+//                  {
+//                    curLowestNodeOrder = nodeOrder
+//                  }
+//
+//                  assert(!removedNodes.contains(node))
+//
+//                  toInsert.add(node.getItem)
+//
+//                  node.decrementCount(leafCount)
+//
+//                  if (node.getCount == 0 && !node.hasChildren)
+//                  {
+//                    removedNodes.add(node)
+//                    removeNodeFromHeaders(node)
+//                    node.getParent.removeChild(node)
+//                  }
+//                  else if (!node.hasChildren && !sortedNodes.contains(node))
+//                    leavesToInspect.add(node)
+//
+//                  node = node.getParent
+//                }
+//
+//              }
+//
+//              node.decrementCount(leafCount)
+//
+//              reinsertBranch(toInsert, leafCount, node)
+//            }
+//        }
+//      }
+//  }
+    def sortByNewOrder(): Unit = {
+      // We need to walk the tree from each leaf to each root
+      val leavesToInspect: util.List[FPTreeNode] = new util.ArrayList[FPTreeNode](leafNodes)
+      val removedNodes: util.Set[FPTreeNode] = new util.HashSet[FPTreeNode]()
+
+      var i = 0
+      while (i < leavesToInspect.size) {
         val leaf: FPTreeNode = leavesToInspect.get(i)
-        if (leaf == root)
-          {
 
-          }
-        else {
-          if (removedNodes.contains(leaf) || sortedNodes.contains(leaf))
-            {
+        if (leaf != root) {
+          if (!removedNodes.contains(leaf) && !sortedNodes.contains(leaf)) {
+            val leafCount = leaf.getCount
+            val toInsert: util.Set[Int] = new util.HashSet[Int]()
 
-            }
-          else
-            {
-              val leafCount = leaf.getCount
+            toInsert.add(leaf.getItem)
 
-              val toInsert: util.Set[Int] = new util.HashSet[Int]()
+            assert(!leaf.hasChildren)
 
-              toInsert.add(leaf.getItem)
+            removeNodeFromHeaders(leaf)
+            removedNodes.add(leaf)
 
-              assert(!leaf.hasChildren)
+            var curLowestNodeOrder: Int = frequentItemOrder.get(leaf.getItem)
+            var node: FPTreeNode = leaf.getParent
+            node.removeChild(leaf)
 
-              removeNodeFromHeaders(leaf)
+            breakable {
+              while (true) {
+                if (node == root) break()
 
-              removedNodes.add(leaf)
-
-              var curLowestNodeOrder: Int = frequentItemOrder.get(leaf.getItem)
-
-              var node: FPTreeNode = leaf.getParent
-              node.removeChild(leaf)
-
-              breakable {
-                while(true)
-                {
-                  if (node == root)
-                    break()
-
-                  val nodeOrder = frequentItemOrder.get(node.getItem)
-                  if (sortedNodes.contains(node) && nodeOrder < curLowestNodeOrder)
-                    {
-                      break()
-                    }
-                  else if (nodeOrder < curLowestNodeOrder)
-                  {
-                    curLowestNodeOrder = nodeOrder
-                  }
-
-                  assert(!removedNodes.contains(node))
-
-                  toInsert.add(node.getItem)
-
-                  node.decrementCount(leafCount)
-
-                  if (node.getCount == 0 && !node.hasChildren)
-                  {
-                    removedNodes.add(node)
-                    removeNodeFromHeaders(node)
-                    node.getParent.removeChild(node)
-                  }
-                  else if (!node.hasChildren && !sortedNodes.contains(node))
-                    leavesToInspect.add(node)
-
-                  node = node.getParent
+                val nodeOrder = frequentItemOrder.get(node.getItem)
+                if (sortedNodes.contains(node) && nodeOrder < curLowestNodeOrder) {
+                  break()
+                } else if (nodeOrder < curLowestNodeOrder) {
+                  curLowestNodeOrder = nodeOrder
                 }
 
+                assert(!removedNodes.contains(node))
+
+                toInsert.add(node.getItem)
+                node.decrementCount(leafCount)
+
+                if (node.getCount == 0 && !node.hasChildren) {
+                  removedNodes.add(node)
+                  removeNodeFromHeaders(node)
+                  node.getParent.removeChild(node)
+                } else if (!node.hasChildren && !sortedNodes.contains(node)) {
+                  leavesToInspect.add(node)
+                }
+
+                node = node.getParent
               }
-
-              node.decrementCount(leafCount)
-
-              reinsertBranch(toInsert, leafCount, node)
             }
+
+            node.decrementCount(leafCount)
+            reinsertBranch(toInsert, leafCount, node)
+          }
         }
+        i += 1
       }
-  }
+    }
 }
 

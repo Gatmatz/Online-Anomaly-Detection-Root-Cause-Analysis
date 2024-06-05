@@ -121,48 +121,41 @@ class FPTreeNode(item: Int,
   def mergeChildren(otherChildren: util.List[FPTreeNode]): Unit = {
     assert(!hasChildren || !treeOfOrigin.leafNodes.contains(this))
 
-    if (otherChildren == null)
-    {
+    if (otherChildren == null) {
       return
     }
 
-    if (children == null)
-      {
-        children = new util.ArrayList[FPTreeNode](otherChildren)
-        for (i <- 0 until otherChildren.size())
-        {
-          val child: FPTreeNode = otherChildren.get(i)
-          child.parent = this
-        }
-        treeOfOrigin.leafNodes.remove(this)
+    if (children == null) {
+      children = new util.ArrayList[FPTreeNode](otherChildren)
+      for (i <- 0 until otherChildren.size()) {
+        val child: FPTreeNode = otherChildren.get(i)
+        child.parent = this
       }
+      treeOfOrigin.leafNodes.remove(this)
+      return
+    }
 
-    // O(N^2); slow for large lists; consider optimizing
+    // Create a map to quickly find children by their item
+    val ourChildrenMap = new util.HashMap[Int, FPTreeNode]()
+    for (i <- 0 until children.size()) {
+      val ourChild: FPTreeNode = children.get(i)
+      ourChildrenMap.put(ourChild.getItem, ourChild)
+    }
+
     for (i <- 0 until otherChildren.size()) {
       val otherChild: FPTreeNode = otherChildren.get(i)
       otherChild.parent = this
-      var matched: Boolean = false
-      breakable {
-        for (j <- 0 until children.size()) {
-          val ourChild: FPTreeNode = children.get(j)
-          if (otherChild.getItem == ourChild.getItem) {
-            treeOfOrigin.removeNodeFromHeaders(otherChild)
+      val ourChild: FPTreeNode = ourChildrenMap.get(otherChild.getItem)
 
-            ourChild.count = ourChild.count + otherChild.count
-            ourChild.mergeChildren(otherChild.getChildren)
-
-            matched = true
-            break()
-          }
-        }
+      if (ourChild != null) {
+        treeOfOrigin.removeNodeFromHeaders(otherChild)
+        ourChild.count += otherChild.count
+        ourChild.mergeChildren(otherChild.getChildren)
+      } else {
+        children.add(otherChild)
+        ourChildrenMap.put(otherChild.getItem, otherChild)
       }
-
-      if (!matched)
-        {
-          children.add(otherChild)
-        }
     }
-
   }
 
   /**

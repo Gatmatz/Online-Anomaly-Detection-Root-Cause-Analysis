@@ -26,7 +26,7 @@ class StreamingFPGrowthTest {
     allTxns.add(intIfy("a, b, c"))
     allTxns.add(intIfy("a, b"))
 
-    val fp = new StreamingFPGrowth(support = .5)
+    val fp = new StreamingFPGrowth(support = 0.5)
     fp.buildTree(allTxns)
     var itemsets = fp.getItemsets
     assertEquals(7, itemsets.size)
@@ -79,33 +79,30 @@ class StreamingFPGrowthTest {
     var cnt = 0
 
     val frequentItems: util.Map[Int, Double] = new util.HashMap[Int, Double]()
-    for (cnt <- 0 until 1000)
-      {
-        val itemSetSize: Int = random.nextInt(100)
-        val itemSet: util.Set[Int] = new util.HashSet[Int](itemSetSize)
-        for (i <- 0 until itemSetSize)
-          {
-            itemSet.add(random.nextInt(100))
-            frequentItems.compute(i, (k: Int, v: Double) => if (v == null) 1
-            else v + 1)
-          }
-
-        fp.insertTransactionFalseNegative(itemSet)
-
-        if (cnt % 20 == 0)
-          {
-            val toDecay: Int = random.nextInt(frequentItems.size)
-            for (i <- 0 until toDecay)
-              {
-                val keySet: util.Set[Int] = frequentItems.keySet()
-                val keyArray: util.ArrayList[Int] = new util.ArrayList[Int](keySet)
-                val randomIndex = random.nextInt(frequentItems.size())
-                frequentItems.remove(keyArray.get(randomIndex))
-              }
-
-            fp.decayAndResetFrequentItems(frequentItems, .95)
-          }
+    for (cnt <- 0 to 1000) {
+      val itemSetSize: Int = random.nextInt(100)
+      val itemSet: util.Set[Int] = new util.HashSet[Int](itemSetSize)
+      for (i <- 0 until itemSetSize) {
+        itemSet.add(random.nextInt(100))
+        frequentItems.compute(i, (k: Int, v: Double) => if (v == null) 1
+        else v + 1)
       }
 
+      fp.insertTransactionFalseNegative(itemSet)
+
+      if (cnt % 20 == 0) {
+        val toDecay: Int = random.nextInt(frequentItems.size)
+        for (i <- 0 until toDecay) {
+          val keySet: util.Set[Int] = frequentItems.keySet()
+          val keyArray: util.ArrayList[Int] = new util.ArrayList[Int](keySet)
+          val randomIndex = random.nextInt(frequentItems.size())
+          frequentItems.remove(keyArray.get(randomIndex))
+        }
+
+        fp.decayAndResetFrequentItems(frequentItems, .95)
+      }
+    }
+
+    val itemsets = fp.getItemsets
   }
 }
