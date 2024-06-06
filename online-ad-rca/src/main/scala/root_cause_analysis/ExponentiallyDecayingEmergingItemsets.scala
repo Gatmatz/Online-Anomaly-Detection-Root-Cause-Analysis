@@ -10,8 +10,10 @@ import utils.encoder.IntegerEncoder
 import utils.itemset.FPTree.StreamingFPGrowth
 import utils.itemset.RiskRatio
 
-import scala.collection.mutable
+import java.util
+import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
+
 class ExponentiallyDecayingEmergingItemsets(
                                            inlierSummarySize: Int, // Size of the heavy-hitters sketch on the inliers
                                            outlierSummarySize: Int, // Size of the heavy-hitters sketch on the outliers
@@ -35,7 +37,7 @@ class ExponentiallyDecayingEmergingItemsets(
 
   private var encoderState: ValueState[IntegerEncoder] = _ // Integer Encoder for translating the attributes to unique integers.
 
-  private var interestingItems: mutable.HashMap[Int, Double] = _
+  private var interestingItems: util.HashMap[Int, Double] = _
 
   private var tupleCount: Int = _
 
@@ -103,7 +105,8 @@ class ExponentiallyDecayingEmergingItemsets(
 
   override def processElement(value: AnomalyEvent, ctx: KeyedProcessFunction[Int, AnomalyEvent, RCAResult]#Context, out: Collector[RCAResult]): Unit = {
     tupleCount = tupleCount + 1
-
+    if (tupleCount == 100)
+      println(tupleCount)
     // Fetch inliers count state
     numInliers = numInliersState.value()
     if (numInliers == null)
@@ -163,7 +166,7 @@ class ExponentiallyDecayingEmergingItemsets(
     // Check summarization time
     if ((tupleCount % (summarizationTime + 1) == 0) & tupleCount != 0)
       {
-        getItemsets.foreach(out.collect)
+        getItemsets().asScala.foreach(out.collect)
       }
 
     if (value.isOutlier)
@@ -212,38 +215,33 @@ class ExponentiallyDecayingEmergingItemsets(
         return
       }
 
-    val outlierCounts: java.util.HashMap[Int, Double] = outlierCountSummary.getCounts
-    val inlierCounts: java.util.HashMap[Int, Double] = inlierCountSummary.getCounts
+    val outlierCounts: util.HashMap[Int, Double] = outlierCountSummary.getCounts
+    val inlierCounts: util.HashMap[Int, Double] = inlierCountSummary.getCounts
 
     val supportCountRequired: Int = (outlierCountSummary.getTotalCount * minSupportOutlier).toInt
 
-    interestingItems = mutable.HashMap()
+    interestingItems = new util.HashMap[Int, Double]()
+    outlierCounts.entrySet().forEach(outlierCount =>
+      if (outlierCount.getValue < supportCountRequired)
+        {
 
-//    for ((key, value) <- outlierCounts)
-//      {
-//        if (value < supportCountRequired)
-//          {
-//
-//          }
-//        else
-//          {
-//            val inlierCount: Double = inlierCounts.getOrElse(key, -1.0)
-//
-//            if (inlierCount != -1.0 && RiskRatio.compute(inlierCount, value, inlierCountSummary.getTotalCount, outlierCountSummary.getTotalCount).get() < minRatio)
-//              {
-//
-//              }
-//            else
-//              {
-//                interestingItems.put(key, value)
-//              }
-//          }
-//      }
+        }
+      else
+        {
+          val inlierCount: Double = inlierCounts.get(outlierCount.getKey)
 
+          if (inlierCount != null && RiskRatio.compute(inlierCount, outlierCount.getValue, inlierCountSummary.getTotalCount, outlierCountSummary.getTotalCount).get() < minRatio)
+            {
+
+            }
+
+          interestingItems.put(outlierCount.getKey, outlierCount.getValue)
+        }
+    )
     val decayRate = if (doDecay) exponentialDecayRate else 0
-//    outlierPatternSummary.decayAndResetFrequentItems(interestingItems, decayRate)
+    outlierPatternSummary.decayAndResetFrequentItems(interestingItems, decayRate)
 
-//    inlierPatternSummary.decayAndResetFrequentItems(interestingItems, decayRate)
+    inlierPatternSummary.decayAndResetFrequentItems(interestingItems, decayRate)
 
   }
 
@@ -267,7 +265,7 @@ class ExponentiallyDecayingEmergingItemsets(
     outlierCountSummary.observe(attributes)
 
     if (!combinationsEnabled || attributeDimension > 1) {
-//      outlierPatternSummary.insertTransactionFalseNegative(attributes.toSet)
+      outlierPatternSummary.insertTransactionFalseNegative(attributes.toSet.asJava)
     }
   }
 
@@ -278,117 +276,140 @@ class ExponentiallyDecayingEmergingItemsets(
 
     if (!combinationsEnabled || attributeDimension > 1)
       {
-//        inlierPatternSummary.insertTransactionFalseNegative(attributes.toSet)
+        inlierPatternSummary.insertTransactionFalseNegative(attributes.toSet.asJava)
       }
   }
 
-  private def getSingleItemItemsets: ListBuffer[RCAResult] = {
+  private def getSingleItemItemsets: util.List[RCAResult] = {
     val supportCountRequired: Double = outlierCountSummary.getTotalCount * minSupportOutlier
-    val ret: ListBuffer[RCAResult] = ListBuffer.empty[RCAResult]
+    val ret = new util.ArrayList[RCAResult]()
     val inlierCounts = inlierCountSummary.getCounts
     val outlierCounts = outlierCountSummary.getCounts
 
-//    for ((key, value) <- outlierCounts)
-//      {
-//        if (value < supportCountRequired)
-//          {
-//
-//          }
-//        else
-//          {
-//            val exposedInlierCount: Double = inlierCounts.get(key)
-//            val ratio: Double = RiskRatio.compute(exposedInlierCount, value, inlierCountSummary.getTotalCount,outlierCountSummary.getTotalCount).getCorrectedRiskRatio()
-//            if (ratio > minRatio)
-//              {
-//                val outlierCountValue: Double = value
-//                val support = outlierCountValue / outlierCountSummary.getTotalCount
-//                val dimension = encoder.getAttribute(key)
-//                val dimensionSummary = DimensionSummary(dimension, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-//                ret += RCAResult(null, null, 0.0, 0.0, support, outlierCountValue, ratio, "all", List(dimensionSummary))
-//              }
-//          }
-//      }
+    outlierCounts.entrySet().forEach(outlierCount =>
+      if (outlierCount.getValue < supportCountRequired)
+        {
+
+        }
+      else
+        {
+          val ratio: Double = RiskRatio.compute(inlierCounts.get(outlierCount.getKey),
+            outlierCount.getValue,
+            inlierCountSummary.getTotalCount,
+            outlierCountSummary.getTotalCount).getCorrectedRiskRatio()
+
+          val dimension = encoder.getAttribute(outlierCount.getKey)
+          val dimensionSummary = DimensionSummary(dimension, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+          if (ratio > minRatio)
+            {
+              ret.add(RCAResult(null,
+                null,
+                0,
+                0,
+                outlierCount.getValue / outlierCountSummary.getTotalCount,
+                outlierCount.getValue,
+                ratio,
+                "all",
+                List(dimensionSummary)))
+            }
+        }
+    )
     ret
   }
 
-  def getItemsets : List[RCAResult] = {
-//    val singleItemsets = getSingleItemItemsets
-//
-//    if (!combinationsEnabled || attributeDimension == 1)
-//      {
-//        return singleItemsets.toList
-//      }
-//
-//    val iwc = outlierPatternSummary.getItemsets
-//    val sortedIwc = iwc.sortWith { (x, y) =>
-//      if (x.getCount != y.getCount)
-//        x.getCount > y.getCount
-//      else
-//        x.getItems.size > y.getItems.size
-//    }
-//
-//    val ratioItemsToCheck: mutable.HashSet[Int] = mutable.HashSet.empty[Int]
-//    val ratioSetsToCheck: mutable.ListBuffer[ItemsetWithCount] = mutable.ListBuffer.empty[ItemsetWithCount]
-//    val ret: ListBuffer[RCAResult] = singleItemsets
-//
-//    var prevSet: Option[mutable.Set[Int]] = None
-//    var prevCount: Double = -1.0
-//
-//    for (i <- iwc) {
-//      if (i.getCount == prevCount) {
-//        prevSet match {
-//          case Some(ps) if ps.diff(i.getItems).isEmpty => // continue
-//          case _ =>
-//        }
-//      }
-//
-//      prevCount = i.getCount
-//      prevSet = Some(i.getItems)
-//
-//      if (i.getItems.size != 1) {
-//        ratioItemsToCheck ++= i.getItems
-//        ratioSetsToCheck += i
-//      }
-//    }
-//
-//    val matchingInlierCounts: List[ItemsetWithCount] = inlierPatternSummary.getCounts(ratioSetsToCheck.toList)
-//
-//    assert(matchingInlierCounts.size == ratioSetsToCheck.size)
-//    for (i <- matchingInlierCounts.indices) {
-//      val ic: ItemsetWithCount = matchingInlierCounts(i)
-//      val oc = ratioSetsToCheck(i)
-//
-//      val ratio: Double = RiskRatio.compute(ic.getCount,
-//        oc.getCount,
-//        inlierCountSummary.getTotalCount,
-//        outlierCountSummary.getTotalCount).getCorrectedRiskRatio()
-//
-//      if (ratio >= minRatio)
-//        {
-//          val support = oc.getCount / outlierCountSummary.getTotalCount
-//          val outlierCountValue = oc.getCount
-//          val attributeSummaries = ListBuffer[DimensionSummary]()
-//
-//          for (item <- oc.getItems) {
-//            val dimension = encoder.getAttribute(item)
-//            val dimensionSummary = DimensionSummary(dimension, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-//            attributeSummaries += dimensionSummary
-//          }
-//
-//          val summary = RCAResult(null, null, 0.0, 0.0, support, outlierCountValue, ratio, "all", attributeSummaries.toList)
-//          ret += summary
-//        }
-//    }
-//
-//    // finally sort one last time
-//    val sortedRet: ListBuffer[RCAResult] = ret.sortWith { (x: RCAResult, y:RCAResult) =>
-//      if (x.currentTotal != y.currentTotal)
-//        x.currentTotal > y.currentTotal
-//      else
-//        x.dimensionSummaries.size > y.dimensionSummaries.size
-//    }
-//
-//    sortedRet.toList
-    return null
+  def getItemsets(): util.List[RCAResult] = {
+    val singleItemsets: util.List[RCAResult] = getSingleItemItemsets
+
+    if (!combinationsEnabled || attributeDimension == 1) {
+      return singleItemsets
+    }
+
+    val iwc: util.List[ItemsetWithCount] = outlierPatternSummary.getItemsets
+
+    iwc.sort((x, y) =>
+      if (x.getCount != y.getCount)
+        -java.lang.Double.compare(x.getCount, y.getCount)
+      else
+        -java.lang.Double.compare(x.getItems.size, y.getItems.size)
+    )
+
+    val ratioItemsToCheck: util.Set[Int] = new util.HashSet[Int]()
+    val ratioSetsToCheck: util.List[ItemsetWithCount] = new util.ArrayList[ItemsetWithCount]()
+    val ret: util.List[RCAResult] = singleItemsets
+
+    var prevSet: util.Set[Int] = null
+    var prevCount: Double = -1.0
+    for (i <- iwc.asScala) {
+      if (i.getCount == prevCount) {
+        val prevSetScala = prevSet.asScala
+        val iToScala = i.getItems.asScala
+
+        if (prevSet != null && iToScala.diff(prevSetScala).isEmpty) {
+          // Skip this iteration
+        } else {
+          prevCount = i.getCount
+          prevSet = i.getItems
+          if (i.getItems.size != 1) {
+            ratioItemsToCheck.addAll(i.getItems)
+            ratioSetsToCheck.add(i)
+          }
+        }
+      } else {
+        prevCount = i.getCount
+        prevSet = i.getItems
+        if (i.getItems.size != 1) {
+          ratioItemsToCheck.addAll(i.getItems)
+          ratioSetsToCheck.add(i)
+        }
+      }
+    }
+
+    // check the ratios of any itemsets we just marked
+    val matchingInlierCounts: util.List[ItemsetWithCount] = inlierPatternSummary.getCounts(ratioSetsToCheck)
+
+    assert(matchingInlierCounts.size == ratioSetsToCheck.size)
+    for (i <- 0 until matchingInlierCounts.size) {
+      val ic: ItemsetWithCount = matchingInlierCounts.get(i)
+      val oc: ItemsetWithCount = ratioSetsToCheck.get(i)
+
+      val ratio: Double = RiskRatio.compute(
+        ic.getCount,
+        oc.getCount,
+        inlierCountSummary.getTotalCount,
+        outlierCountSummary.getTotalCount
+      ).getCorrectedRiskRatio()
+
+      if (ratio >= minRatio) {
+        val attributeSummaries = new ListBuffer[DimensionSummary]()
+
+        oc.getItems.forEach {item =>
+          val dimension = encoder.getAttribute(item)
+          val dimensionSummary: DimensionSummary = DimensionSummary(dimension, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+          attributeSummaries += dimensionSummary
+        }
+
+        ret.add(RCAResult(null,
+          null,
+          0,
+          0,
+          oc.getCount / outlierCountSummary.getTotalCount,
+          oc.getCount,
+          ratio,
+          "all",
+          attributeSummaries.toList
+          ))
+      }
+    }
+
+    // finally sort one last time
+    ret.sort((x, y) =>
+      if (x.numRecords != y.numRecords)
+        -java.lang.Double.compare(x.numRecords, y.numRecords)
+      else
+        -java.lang.Double.compare(x.dimensionSummaries.size, y.dimensionSummaries.size)
+    )
+
+    ret
   }
 }

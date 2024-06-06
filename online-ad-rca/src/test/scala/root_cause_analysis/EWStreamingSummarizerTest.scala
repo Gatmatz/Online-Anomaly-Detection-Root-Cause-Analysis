@@ -131,8 +131,6 @@ class EWStreamingSummarizerTest {
     // Output
     val summaries: List[RCAResult] = summaryStream.executeAndCollect().toList
 
-    println(summaries)
-
     assertEquals(parallelism, summaries.size)
     assertEquals(1, summaries.head.dimensionSummaries.size)
     assertEquals("A1", summaries.head.dimensionSummaries.head.dimension.name)
