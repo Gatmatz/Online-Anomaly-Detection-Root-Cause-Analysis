@@ -1,5 +1,6 @@
-package aggregators
+package transformers
 
+import aggregators.OffsetBaselineAggregator
 import aggregators.metric_aggregators.SumAggregator
 import anomaly_detection.detectors.EWAppxPercentileOutlierClassifierSpec
 import config.AppConfig
@@ -9,7 +10,6 @@ import org.apache.flink.streaming.api.windowing.assigners.SlidingEventTimeWindow
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.scalatest.flatspec.AnyFlatSpec
 import sources.kafka.InputRecordStreamBuilder
-import transformers.EWFeatureTransform
 
 class EWFeatureTransformTest extends AnyFlatSpec
 {

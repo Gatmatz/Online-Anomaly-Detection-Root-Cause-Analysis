@@ -4,6 +4,7 @@ import aggregators.OffsetBaselineAggregator
 import aggregators.metric_aggregators.SumAggregator
 import anomaly_detection.AnomalyDetector
 import models.{AggregatedRecords, AggregatedRecordsWBaseline, AnomalyEvent, InputRecord}
+import org.apache.flink.api.common.functions.MapFunction
 import org.apache.flink.streaming.api.scala.{DataStream, createTypeInformation}
 import org.apache.flink.streaming.api.windowing.assigners.SlidingEventTimeWindows
 import org.apache.flink.streaming.api.windowing.time.Time

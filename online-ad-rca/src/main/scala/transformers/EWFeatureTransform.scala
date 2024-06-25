@@ -55,7 +55,6 @@ class EWFeatureTransform(spec: EWAppxPercentileOutlierClassifierSpec
 
   override def processElement(value: AggregatedRecordsWBaseline, ctx: KeyedProcessFunction[Int, AggregatedRecordsWBaseline, (AggregatedRecordsWBaseline, Double)]#Context, out: Collector[(AggregatedRecordsWBaseline, Double)]): Unit = {
     tupleCount = tupleCount + 1
-
     // Fetch reservoir state
     var reservoir = reservoirState.value()
     if (reservoir == null)

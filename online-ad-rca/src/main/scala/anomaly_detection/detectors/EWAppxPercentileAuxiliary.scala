@@ -56,7 +56,6 @@ class EWAppxPercentileAuxiliary(spec: EWAppxPercentileOutlierClassifierSpec)
 
   override def processElement(value: (AggregatedRecordsWBaseline, Double), ctx: KeyedProcessFunction[Int, (AggregatedRecordsWBaseline, Double), AnomalyEvent]#Context, out: Collector[AnomalyEvent]): Unit = {
     tupleCount = tupleCount + 1
-
     // Fetch reservoir state
     var reservoir = reservoirState.value()
     if (reservoir == null)

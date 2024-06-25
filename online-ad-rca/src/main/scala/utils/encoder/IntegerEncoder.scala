@@ -45,6 +45,8 @@ class IntegerEncoder extends Serializable {
 
     val group: Types.DimensionGroup = AppConfig.InputStream.DIMENSION_DEFINITIONS.getConfig(dimensionName).getString("group")
     val level: Types.DimensionLevel = AppConfig.InputStream.DIMENSION_LEVELS(dimensionName)
+
+    // Uncomment these lines and comment the line 46 & 47 when testing on CSV data
 //    val group: String = "column"
 //    val level: Int = 1
 

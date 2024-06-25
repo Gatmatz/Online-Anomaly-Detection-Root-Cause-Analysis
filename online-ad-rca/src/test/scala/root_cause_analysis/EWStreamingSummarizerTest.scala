@@ -72,7 +72,6 @@ class EWStreamingSummarizerTest {
     anomalySpec.percentile = 0.99
 
     // Root Cause Analysis Spec
-    val batchSize = 99
     val attributes = List("A1", "A2", "A3", "A4")
     val summarizerSpec = new EWStreamingSummarizerSpec(
       summaryUpdatePeriod = 50,
@@ -83,7 +82,8 @@ class EWStreamingSummarizerTest {
       minOIRatio = 1,
       minSupport = 0.02,
       attributes = attributes,
-      attributeCombinations = true
+      attributeCombinations = true,
+      summaryGenerationPeriod = 99
     )
 
     // MAD training Initialization
@@ -93,7 +93,7 @@ class EWStreamingSummarizerTest {
     val detector = new EWAppxPercentileAuxiliary(anomalySpec)
 
     // Root Cause Analysis Initialization
-    val summarizer = new EWStreamingSummarizer(summarizerSpec, batchSize)
+    val summarizer = new EWStreamingSummarizer(summarizerSpec)
 
     // Input Stream Initialization
     val dataStream: DataStream[AggregatedRecordsWBaseline] = env.fromCollection(records)
@@ -160,7 +160,6 @@ class EWStreamingSummarizerTest {
     anomalySpec.percentile = 0.99
 
     // Root Cause Analysis Spec
-    val batchSize = 9999
     val attributes = List("device_id")
     val summarizerSpec = new EWStreamingSummarizerSpec(
       summaryUpdatePeriod = 50,
@@ -171,7 +170,8 @@ class EWStreamingSummarizerTest {
       minOIRatio = 1,
       minSupport = 0.01,
       attributes = attributes,
-      attributeCombinations = true
+      attributeCombinations = true,
+      summaryGenerationPeriod = 9999
     )
 
     // MAD training Initialization
@@ -181,7 +181,7 @@ class EWStreamingSummarizerTest {
     val detector = new EWAppxPercentileAuxiliary(anomalySpec)
 
     // Root Cause Analysis Initialization
-    val summarizer = new EWStreamingSummarizer(summarizerSpec, batchSize)
+    val summarizer = new EWStreamingSummarizer(summarizerSpec)
 
     // Input Stream Initialization
     val dataStream: DataStream[AggregatedRecordsWBaseline] = env.fromCollection(records)
@@ -249,7 +249,6 @@ class EWStreamingSummarizerTest {
     anomalySpec.percentile = 0.99
 
     // Root Cause Analysis Spec
-    val batchSize = 9999
     val attributes = List("device_id", "model", "firmware_version")
     val summarizerSpec = new EWStreamingSummarizerSpec(
       summaryUpdatePeriod = 1000,
@@ -260,7 +259,8 @@ class EWStreamingSummarizerTest {
       minOIRatio = 1,
       minSupport = 0.06,
       attributes = attributes,
-      attributeCombinations = true
+      attributeCombinations = true,
+      summaryGenerationPeriod = 9999
     )
 
     // MAD training Initialization
@@ -270,7 +270,7 @@ class EWStreamingSummarizerTest {
     val detector = new EWAppxPercentileAuxiliary(anomalySpec)
 
     // Root Cause Analysis Initialization
-    val summarizer = new EWStreamingSummarizer(summarizerSpec, batchSize)
+    val summarizer = new EWStreamingSummarizer(summarizerSpec)
 
     // Input Stream Initialization
     val dataStream: DataStream[AggregatedRecordsWBaseline] = env.fromCollection(records)
@@ -308,7 +308,7 @@ class EWStreamingSummarizerTest {
 
     // Output
     val summaries: List[RCAResult] = summaryStream.executeAndCollect().toList
-
+    print(summaries)
     assertEquals(3, summaries.size)
     summaries.foreach(println(_))
     for (summary <- summaries) {
@@ -378,7 +378,8 @@ class EWStreamingSummarizerTest {
       minOIRatio = 1,
       minSupport = 0.01,
       attributes = attributes,
-      attributeCombinations = true
+      attributeCombinations = true,
+      summaryGenerationPeriod = 378
     )
 
     // Anomaly Detection
@@ -386,7 +387,7 @@ class EWStreamingSummarizerTest {
     anomalyDetector.init(anomalySpec)
 
     // Root Cause Analysis Initialization
-    val summarizer = new EWStreamingSummarizer(summarizerSpec, 378)
+    val summarizer = new EWStreamingSummarizer(summarizerSpec)
 
     // Input Stream Initialization
     val dataStream: DataStream[InputRecord] = InputRecordStreamBuilder

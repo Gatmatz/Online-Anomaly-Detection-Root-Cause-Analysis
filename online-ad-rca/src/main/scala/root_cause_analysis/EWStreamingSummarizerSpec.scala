@@ -10,5 +10,6 @@ case class EWStreamingSummarizerSpec(
                                       minOIRatio: Double,
                                       minSupport: Double,
                                       attributes: List[String],
-                                      attributeCombinations: Boolean
+                                      attributeCombinations: Boolean,
+                                      summaryGenerationPeriod: Int
                                     ) extends Serializable

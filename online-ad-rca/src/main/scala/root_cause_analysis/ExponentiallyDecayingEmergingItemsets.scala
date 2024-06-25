@@ -1,5 +1,6 @@
 package root_cause_analysis
 
+import config.AppConfig
 import models._
 import org.apache.flink.api.common.state.{ValueState, ValueStateDescriptor}
 import org.apache.flink.configuration.Configuration
@@ -10,6 +11,7 @@ import utils.encoder.IntegerEncoder
 import utils.itemset.FPTree.StreamingFPGrowth
 import utils.itemset.RiskRatio
 
+import java.time.LocalDateTime
 import java.util
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
@@ -105,8 +107,6 @@ class ExponentiallyDecayingEmergingItemsets(
 
   override def processElement(value: AnomalyEvent, ctx: KeyedProcessFunction[Int, AnomalyEvent, RCAResult]#Context, out: Collector[RCAResult]): Unit = {
     tupleCount = tupleCount + 1
-    if (tupleCount == 100)
-      println(tupleCount)
     // Fetch inliers count state
     numInliers = numInliersState.value()
     if (numInliers == null)
@@ -166,7 +166,9 @@ class ExponentiallyDecayingEmergingItemsets(
     // Check summarization time
     if ((tupleCount % (summarizationTime + 1) == 0) & tupleCount != 0)
       {
-        getItemsets().asScala.foreach(out.collect)
+        val itemsets = getItemsets().asScala
+        itemsets.sortBy(-_.ratioToInliers).take(AppConfig.RootCauseAnalysis.SUMMARY_SIZE)
+        itemsets.foreach(out.collect)
       }
 
     if (value.isOutlier)
@@ -304,7 +306,7 @@ class ExponentiallyDecayingEmergingItemsets(
           if (ratio > minRatio)
             {
               ret.add(RCAResult(null,
-                null,
+                LocalDateTime.now(),
                 0,
                 0,
                 outlierCount.getValue / outlierCountSummary.getTotalCount,
@@ -390,7 +392,7 @@ class ExponentiallyDecayingEmergingItemsets(
         }
 
         ret.add(RCAResult(null,
-          null,
+          LocalDateTime.now(),
           0,
           0,
           oc.getCount / outlierCountSummary.getTotalCount,
