@@ -255,7 +255,7 @@ class ExponentiallyDecayingEmergingItemsets(
   }
 
   private def getIntegerAttributes(event: AggregatedRecordsWBaseline): List[Int] = {
-    (event.current_dimensions_breakdown.keySet ++ event.baseline_dimensions_breakdown.keySet).map(dim => {
+    event.current_dimensions_breakdown.keySet.map(dim => {
       val encoding = encoder.getIntegerEncoding(dim)
       encoding
     }).toList

@@ -1,7 +1,6 @@
 package utils.count
 
 import java.util
-import java.util.{HashMap, Map}
 import scala.collection.convert.ImplicitConversions.`collection AsScalaIterable`
 /**
  * Maintains probabilistic heavy-hitters:

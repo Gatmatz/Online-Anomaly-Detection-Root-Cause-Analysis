@@ -26,7 +26,7 @@ class EWAppxPercentileAuxiliaryTest extends AnyFlatSpec
     spec.decayRate = 0.01
     spec.trainingPeriodType = "TUPLE_BASED"
     spec.trainingPeriod = 50
-    spec.percentile = 0.8
+    spec.percentile = 0.9
 
     //Input Stream
     val inputStream: DataStream[InputRecord] = InputRecordStreamBuilder.buildInputRecordStream(env)
@@ -49,7 +49,7 @@ class EWAppxPercentileAuxiliaryTest extends AnyFlatSpec
       .keyBy(_ => 0)
       .process(featureTransform)
 
-    aggregatedRecordsWScore.print()
+//    aggregatedRecordsWScore.print()
 
     // Anomaly Detection
     val detector = new EWAppxPercentileAuxiliary(spec)
@@ -58,7 +58,7 @@ class EWAppxPercentileAuxiliaryTest extends AnyFlatSpec
       .keyBy(_ => 0)
       .process(detector)
 
-    anomalyEventStream.print()
+    anomalyEventStream.filter(_.isOutlier == true).print()
     env.execute("EWAppxPercentileOutlierDetector test")
   }
 }

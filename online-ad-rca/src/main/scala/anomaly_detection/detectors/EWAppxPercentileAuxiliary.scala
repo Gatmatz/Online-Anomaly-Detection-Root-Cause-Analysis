@@ -12,7 +12,7 @@ import scala.util.Random
 
 /**
  * Auxiliary class for the exponentially weighted approximate percentile-based streaming classifier from Macrobase.
- * This class is a FlatMapFunction that performs the AD detection by keeping state of an ADR reservoir(sampling).
+ * This class is a KeyedProcessFunction that performs the AD detection by keeping state of an ADR reservoir(sampling).
  * The function accepts a Stream of tuples in the form of (AggregatedRecordsWBaseline, Score)
  * and emits tuples of (AggregatedRecordsWBaseline, Boolean)
  * where Boolean will be an indicator of whether the Record is an Anomaly or not.
